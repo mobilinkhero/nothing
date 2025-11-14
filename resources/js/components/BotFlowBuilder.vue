@@ -61,6 +61,10 @@ import WebhookApiNode from "./nodes/WebhookApi.vue";
 import ConditionNode from "./nodes/ConditionNode.vue";
 import DelayNode from "./nodes/DelayNode.vue";
 import InputCollectionNode from "./nodes/InputCollectionNode.vue";
+// Phase 2 New Nodes
+import QuickRepliesNode from "./nodes/QuickRepliesNode.vue";
+import TagManagementNode from "./nodes/TagManagementNode.vue";
+import VariableManagementNode from "./nodes/VariableManagementNode.vue";
 // Custom edge
 import CustomEdge from "./ui/CustomEdge.vue";
 
@@ -80,6 +84,9 @@ const nodeTypes = markRaw({
     condition: ConditionNode,
     delay: DelayNode,
     inputCollection: InputCollectionNode,
+    quickReplies: QuickRepliesNode,
+    tagManagement: TagManagementNode,
+    variableManagement: VariableManagementNode,
 });
 
 // Custom edge types
@@ -235,6 +242,22 @@ const nodeTemplates = reactive([
         label: "Input Collection",
         icon: HiDocumentText,
     },
+    // Phase 2 New Nodes
+    {
+        type: "quickReplies",
+        label: "Quick Replies",
+        icon: BsChatRightQuote,
+    },
+    {
+        type: "tagManagement",
+        label: "Tag Management",
+        icon: BsGearFill,
+    },
+    {
+        type: "variableManagement",
+        label: "Variable Manager",
+        icon: HiDocumentText,
+    },
 ]);
 
 // Group node templates by category
@@ -248,6 +271,8 @@ const nodeCategories = computed(() => {
             "contactMessage",
         ],
         "Flow Control": ["condition", "delay", "inputCollection"],
+        "Data & Variables": ["variableManagement", "tagManagement"],
+        "User Interaction": ["quickReplies"],
         "Advanced Features": aiAssistantEnabled.value
             ? ["aiAssistant", "webhookApi"]
             : ["webhookApi"],
@@ -380,6 +405,43 @@ function addNodeAtPosition(type, position) {
                 isValid: true
             };
             break;
+        case "quickReplies":
+            nodeData = {
+                message: '',
+                header: '',
+                footer: '',
+                replies: [
+                    { text: '', id: 'reply-0' },
+                    { text: '', id: 'reply-1' },
+                    { text: '', id: 'reply-2' }
+                ],
+                trackAnalytics: true,
+                isValid: true
+            };
+            break;
+        case "tagManagement":
+            nodeData = {
+                action: 'add',
+                tags: [{ name: '', color: 'blue' }],
+                conditions: [],
+                createIfNotExist: true,
+                logActivity: true,
+                isValid: true
+            };
+            break;
+        case "variableManagement":
+            nodeData = {
+                action: 'set',
+                variableName: '',
+                value: '',
+                scope: 'contact',
+                expirationValue: 0,
+                expirationUnit: 'never',
+                encrypt: false,
+                logChanges: true,
+                isValid: true
+            };
+            break;
         // Update other node types similarly...
     }
 
@@ -470,7 +532,10 @@ const validateWorkflow = () => {
             (node.type === "webhookApi" && node.data.isValid === false) ||
             (node.type === "condition" && node.data.isValid === false) ||
             (node.type === "delay" && node.data.isValid === false) ||
-            (node.type === "inputCollection" && node.data.isValid === false)
+            (node.type === "inputCollection" && node.data.isValid === false) ||
+            (node.type === "quickReplies" && node.data.isValid === false) ||
+            (node.type === "tagManagement" && node.data.isValid === false) ||
+            (node.type === "variableManagement" && node.data.isValid === false)
         );
     });
 

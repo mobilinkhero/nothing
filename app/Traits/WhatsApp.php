@@ -1417,6 +1417,15 @@ trait WhatsApp
             case 'inputCollection':
                 return $this->processFlowInputCollection($to, $nodeData, $phoneNumberId, $contactData, $context);
 
+            case 'quickReplies':
+                return $this->sendFlowQuickReplies($to, $nodeData, $phoneNumberId, $contactData, $context);
+
+            case 'tagManagement':
+                return $this->processFlowTagManagement($nodeData, $phoneNumberId, $contactData, $context);
+
+            case 'variableManagement':
+                return $this->processFlowVariableManagement($nodeData, $phoneNumberId, $contactData, $context);
+
             default:
                 return ['status' => false, 'message' => 'Unsupported node type: '.$nodeType];
         }
@@ -3737,5 +3746,311 @@ trait WhatsApp
         $message .= "Please provide all information in your response.";
 
         return $message;
+    }
+
+    /**
+     * Send quick replies message from flow (Phase 2)
+     */
+    protected function sendFlowQuickReplies($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        $message = $this->replaceFlowVariables($nodeData['message'] ?? '', $contactData);
+        $header = $this->replaceFlowVariables($nodeData['header'] ?? '', $contactData);
+        $footer = $this->replaceFlowVariables($nodeData['footer'] ?? '', $contactData);
+        $replies = $nodeData['replies'] ?? [];
+
+        // Filter out empty replies
+        $validReplies = array_filter($replies, function($reply) {
+            return !empty($reply['text']);
+        });
+
+        if (empty($validReplies)) {
+            return ['status' => false, 'message' => 'No valid quick replies configured'];
+        }
+
+        // Build WhatsApp quick reply buttons (interactive message)
+        $buttons = [];
+        foreach (array_values($validReplies) as $index => $reply) {
+            if ($index >= 13) break; // WhatsApp limit
+            
+            $buttons[] = [
+                'type' => 'reply',
+                'reply' => [
+                    'id' => $reply['id'] ?? "reply-{$index}",
+                    'title' => substr($reply['text'], 0, 20) // WhatsApp limit 20 chars
+                ]
+            ];
+        }
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $to,
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button',
+                'body' => [
+                    'text' => $message
+                ],
+                'action' => [
+                    'buttons' => $buttons
+                ]
+            ]
+        ];
+
+        // Add optional header
+        if (!empty($header)) {
+            $payload['interactive']['header'] = [
+                'type' => 'text',
+                'text' => $header
+            ];
+        }
+
+        // Add optional footer
+        if (!empty($footer)) {
+            $payload['interactive']['footer'] = [
+                'text' => $footer
+            ];
+        }
+
+        // Track analytics if enabled
+        if ($nodeData['trackAnalytics'] ?? true) {
+            whatsapp_log('Quick replies sent', 'info', [
+                'to' => $to,
+                'replies_count' => count($buttons),
+                'message' => substr($message, 0, 50)
+            ]);
+        }
+
+        return $this->sendRawApiMessage($phoneNumberId, $payload);
+    }
+
+    /**
+     * Process tag management from flow (Phase 2)
+     */
+    protected function processFlowTagManagement($nodeData, $phoneNumberId, $contactData, $context)
+    {
+        $action = $nodeData['action'] ?? 'add';
+        $tags = $nodeData['tags'] ?? [];
+        $createIfNotExist = $nodeData['createIfNotExist'] ?? true;
+        $logActivity = $nodeData['logActivity'] ?? true;
+
+        $appliedTags = [];
+
+        try {
+            // Process based on action type
+            switch ($action) {
+                case 'add':
+                    foreach ($tags as $tag) {
+                        if (empty($tag['name'])) continue;
+                        
+                        $this->addContactTag($contactData->id, $tag['name'], $createIfNotExist);
+                        $appliedTags[] = $tag['name'];
+                    }
+                    break;
+
+                case 'remove':
+                    foreach ($tags as $tag) {
+                        if (empty($tag['name'])) continue;
+                        
+                        $this->removeContactTag($contactData->id, $tag['name']);
+                        $appliedTags[] = $tag['name'];
+                    }
+                    break;
+
+                case 'replace':
+                    // Remove all existing tags first
+                    $this->clearContactTags($contactData->id);
+                    
+                    // Then add new tags
+                    foreach ($tags as $tag) {
+                        if (empty($tag['name'])) continue;
+                        
+                        $this->addContactTag($contactData->id, $tag['name'], $createIfNotExist);
+                        $appliedTags[] = $tag['name'];
+                    }
+                    break;
+
+                case 'conditional':
+                    $conditions = $nodeData['conditions'] ?? [];
+                    
+                    foreach ($conditions as $condition) {
+                        $variable = $this->getVariableValue($condition['variable'] ?? '', $contactData, $context);
+                        $operator = $condition['operator'] ?? 'equals';
+                        $value = $condition['value'] ?? '';
+                        $tagToApply = $condition['tagToApply'] ?? '';
+
+                        if ($this->evaluateSingleCondition($variable, $operator, $value) && !empty($tagToApply)) {
+                            $this->addContactTag($contactData->id, $tagToApply, $createIfNotExist);
+                            $appliedTags[] = $tagToApply;
+                        }
+                    }
+                    break;
+            }
+
+            // Log activity if enabled
+            if ($logActivity) {
+                whatsapp_log('Tag management executed', 'info', [
+                    'contact_id' => $contactData->id,
+                    'action' => $action,
+                    'tags_applied' => $appliedTags
+                ]);
+            }
+
+            return [
+                'status' => true,
+                'message' => 'Tags processed successfully',
+                'applied_tags' => $appliedTags,
+                'next_handle' => $action === 'conditional' && empty($appliedTags) ? 'no_match' : 'success'
+            ];
+
+        } catch (\Exception $e) {
+            whatsapp_log('Tag management error', 'error', [
+                'error' => $e->getMessage(),
+                'contact_id' => $contactData->id
+            ], $e);
+
+            return ['status' => false, 'message' => 'Failed to process tags: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Process variable management from flow (Phase 2)
+     */
+    protected function processFlowVariableManagement($nodeData, $phoneNumberId, $contactData, $context)
+    {
+        $action = $nodeData['action'] ?? 'set';
+        $variableName = $nodeData['variableName'] ?? '';
+        $value = $nodeData['value'] ?? '';
+        $scope = $nodeData['scope'] ?? 'contact';
+        $encrypt = $nodeData['encrypt'] ?? false;
+        $logChanges = $nodeData['logChanges'] ?? true;
+
+        if (empty($variableName)) {
+            return ['status' => false, 'message' => 'Variable name is required'];
+        }
+
+        try {
+            $processedValue = $value;
+
+            // Process action
+            switch ($action) {
+                case 'set':
+                    // Replace variables in value
+                    $processedValue = $this->replaceFlowVariables($value, $contactData);
+                    break;
+
+                case 'increment':
+                    // Get current value and increment
+                    $currentValue = $this->getFlowVariable($variableName, $contactData, $scope);
+                    $processedValue = (floatval($currentValue) + floatval($value));
+                    break;
+
+                case 'append':
+                    // Get current value and append
+                    $currentValue = $this->getFlowVariable($variableName, $contactData, $scope);
+                    $processedValue = $currentValue . $value;
+                    break;
+
+                case 'clear':
+                    $processedValue = null;
+                    break;
+            }
+
+            // Encrypt if needed
+            if ($encrypt && $processedValue !== null) {
+                $processedValue = encrypt($processedValue);
+            }
+
+            // Calculate expiration timestamp
+            $expiresAt = null;
+            if ($nodeData['expirationUnit'] !== 'never' && !empty($nodeData['expirationValue'])) {
+                $expiresAt = $this->calculateVariableExpiration(
+                    $nodeData['expirationValue'],
+                    $nodeData['expirationUnit']
+                );
+            }
+
+            // Store variable based on scope
+            $this->setFlowVariable($variableName, $processedValue, $contactData, $scope, $expiresAt);
+
+            // Log changes if enabled
+            if ($logChanges) {
+                whatsapp_log('Variable management executed', 'info', [
+                    'variable' => $variableName,
+                    'action' => $action,
+                    'scope' => $scope,
+                    'encrypted' => $encrypt,
+                    'contact_id' => $contactData->id
+                ]);
+            }
+
+            return [
+                'status' => true,
+                'message' => 'Variable processed successfully',
+                'variable' => $variableName,
+                'value' => $encrypt ? '[encrypted]' : $processedValue
+            ];
+
+        } catch (\Exception $e) {
+            whatsapp_log('Variable management error', 'error', [
+                'error' => $e->getMessage(),
+                'variable' => $variableName
+            ], $e);
+
+            return ['status' => false, 'message' => 'Failed to process variable: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Helper methods for tag management
+     */
+    private function addContactTag($contactId, $tagName, $createIfNotExist = true)
+    {
+        // Implementation would depend on your tag system
+        // This is a placeholder - adapt to your actual tag implementation
+        whatsapp_log('Adding tag', 'debug', ['contact_id' => $contactId, 'tag' => $tagName]);
+    }
+
+    private function removeContactTag($contactId, $tagName)
+    {
+        whatsapp_log('Removing tag', 'debug', ['contact_id' => $contactId, 'tag' => $tagName]);
+    }
+
+    private function clearContactTags($contactId)
+    {
+        whatsapp_log('Clearing all tags', 'debug', ['contact_id' => $contactId]);
+    }
+
+    /**
+     * Helper methods for variable management
+     */
+    private function getFlowVariable($variableName, $contactData, $scope)
+    {
+        // Implementation would depend on your variable storage system
+        // This is a placeholder - adapt to your actual implementation
+        return '';
+    }
+
+    private function setFlowVariable($variableName, $value, $contactData, $scope, $expiresAt = null)
+    {
+        // Implementation would depend on your variable storage system
+        whatsapp_log('Setting variable', 'debug', [
+            'variable' => $variableName,
+            'scope' => $scope,
+            'expires_at' => $expiresAt
+        ]);
+    }
+
+    private function calculateVariableExpiration($value, $unit)
+    {
+        $seconds = match($unit) {
+            'minutes' => $value * 60,
+            'hours' => $value * 3600,
+            'days' => $value * 86400,
+            'weeks' => $value * 604800,
+            default => 0
+        };
+
+        return $seconds > 0 ? now()->addSeconds($seconds) : null;
     }
 }
