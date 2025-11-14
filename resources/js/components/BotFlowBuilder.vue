@@ -135,7 +135,12 @@ const initialEdges = ref([]);
 const isFlowValid = ref(false);
 
 // Use Vue Flow composable
-const { addEdges, onConnect, addNodes, setNodes, setEdges } = useVueFlow();
+const { addEdges, onConnect, addNodes, setNodes, setEdges, getNodes, getEdges } = useVueFlow();
+
+// Watch for node and edge changes to update flow validity
+watch([initialNodes, initialEdges], () => {
+    updateFlowValidity();
+}, { deep: true });
 
 // Toggle sidebar collapse
 function toggleSidebar() {
@@ -342,7 +347,8 @@ function addNodeAtPosition(type, position) {
                         logic: 'AND'
                     }
                 ],
-                defaultAction: 'continue'
+                defaultAction: 'continue',
+                isValid: true
             };
             break;
         case "delay":
@@ -350,7 +356,8 @@ function addNodeAtPosition(type, position) {
                 delayType: 'fixed',
                 duration: 3,
                 unit: 'seconds',
-                showTyping: true
+                showTyping: true,
+                isValid: true
             };
             break;
         case "inputCollection":
@@ -369,7 +376,8 @@ function addNodeAtPosition(type, position) {
                 ],
                 collectionMode: 'sequential',
                 maxRetries: 3,
-                skipOnError: false
+                skipOnError: false,
+                isValid: true
             };
             break;
         // Update other node types similarly...
@@ -459,7 +467,10 @@ const validateWorkflow = () => {
             (node.type === "contactMessage" && node.data.isValid === false) ||
             (node.type === "mediaMessage" && node.data.isValid === false) ||
             (node.type === "aiAssistant" && node.data.isValid === false) ||
-            (node.type === "webhookApi" && node.data.isValid === false)
+            (node.type === "webhookApi" && node.data.isValid === false) ||
+            (node.type === "condition" && node.data.isValid === false) ||
+            (node.type === "delay" && node.data.isValid === false) ||
+            (node.type === "inputCollection" && node.data.isValid === false)
         );
     });
 
@@ -634,7 +645,12 @@ onMounted(() => {
             })
             .finally(() => {
                 isLoading.value = false;
+                // Update flow validity after loading
+                updateFlowValidity();
             });
+    } else {
+        // If no flow ID, validate the initial trigger node
+        updateFlowValidity();
     }
 
     // Expose component methods to parent
