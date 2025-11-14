@@ -2,7 +2,7 @@
   <BaseEdge
     :id="id"
     :style="style"
-    :path="path"
+    :path="path[0]"
     :marker-end="markerEnd"
     :marker-start="markerStart"
     class="custom-edge"
@@ -10,9 +10,10 @@
 </template>
 
 <script setup>
-import { BaseEdge } from '@vue-flow/core'
+import { computed } from 'vue'
+import { BaseEdge, getBezierPath } from '@vue-flow/core'
 
-defineProps({
+const props = defineProps({
   id: String,
   sourceX: Number,
   sourceY: Number,
@@ -23,8 +24,18 @@ defineProps({
   style: Object,
   markerEnd: String,
   markerStart: String,
-  path: String,
 })
+
+const path = computed(() => 
+  getBezierPath({
+    sourceX: props.sourceX,
+    sourceY: props.sourceY,
+    sourcePosition: props.sourcePosition,
+    targetX: props.targetX,
+    targetY: props.targetY,
+    targetPosition: props.targetPosition,
+  })
+)
 </script>
 
 <style scoped>

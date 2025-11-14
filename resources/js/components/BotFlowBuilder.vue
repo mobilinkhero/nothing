@@ -87,6 +87,17 @@ const edgeTypes = {
     button: markRaw(CustomEdge),
 };
 
+// Default edge options
+const defaultEdgeOptions = {
+    type: 'button',
+    animated: true,
+    markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+    },
+};
+
 // Flow metadata
 const flowId = ref(null);
 let flowData = ref([]);
@@ -161,11 +172,19 @@ function handleNodeDragStop(event, node) {
 // Handle node connections
 onConnect((params) => {
     console.log('Connection attempt:', params);
-    addEdges({
+    const newEdge = {
         ...params,
+        id: `e${params.source}-${params.target}`,
         animated: true,
         type: "button",
-    });
+        markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,
+            height: 20,
+        },
+    };
+    addEdges(newEdge);
+    console.log('Edge added:', newEdge);
 });
 
 // Node templates for adding new nodes
@@ -846,6 +865,7 @@ function getReplyTypeText(type) {
                         v-model:edges="initialEdges"
                         :node-types="nodeTypes"
                         :edge-types="edgeTypes"
+                        :default-edge-options="defaultEdgeOptions"
                         :default-zoom="1"
                         :min-zoom="0.2"
                         :max-zoom="4"
