@@ -639,6 +639,21 @@ function handleTextNodeValidation(nodeId, isValid) {
     }
 }
 
+// Handle node data updates
+function handleNodeUpdate(payload) {
+    const { id, data } = payload;
+    
+    // Find the node in our nodes array
+    const node = initialNodes.value.find((n) => n.id === id);
+    if (node) {
+        // Update the node data
+        Object.assign(node.data, data);
+        
+        // Update the overall flow validation
+        updateFlowValidity();
+    }
+}
+
 // Watch for changes to save automatically
 watch(
     () => ({
@@ -991,6 +1006,7 @@ function getReplyTypeText(type) {
                         <template #node-textMessage="nodeProps">
                             <TextMessageNode
                                 v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
                                 @update:isValid="
                                     handleTextNodeValidation(
                                         nodeProps.id,
@@ -1027,6 +1043,7 @@ function getReplyTypeText(type) {
                         <template #node-trigger="nodeProps">
                             <TriggerNode
                                 v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
                                 @update:isValid="
                                     handleTextNodeValidation(
                                         nodeProps.id,
@@ -1101,6 +1118,46 @@ function getReplyTypeText(type) {
                         <template #node-webhookApi="nodeProps">
                             <WebhookApiNode
                                 v-bind="nodeProps"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                            />
+                        </template>
+
+                        <!-- Phase 2 Node Templates -->
+                        <template #node-quickReplies="nodeProps">
+                            <QuickRepliesNode
+                                v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                            />
+                        </template>
+
+                        <template #node-tagManagement="nodeProps">
+                            <TagManagementNode
+                                v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                            />
+                        </template>
+
+                        <template #node-variableManagement="nodeProps">
+                            <VariableManagementNode
+                                v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
                                 @update:isValid="
                                     handleTextNodeValidation(
                                         nodeProps.id,
