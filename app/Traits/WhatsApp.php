@@ -3851,8 +3851,20 @@ trait WhatsApp
             // Load WhatsApp Cloud API config
             $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
             
+            if (!$whatsapp_cloud_api) {
+                $this->logFlowDebug('Quick Replies: API config failed to load', [
+                    'phoneNumberId' => $phoneNumberId
+                ]);
+                return [
+                    'status' => false,
+                    'message' => 'WhatsApp API configuration failed to load',
+                    'responseCode' => 500
+                ];
+            }
+            
             $this->logFlowDebug('Quick Replies: Sending via API', [
                 'api_loaded' => !empty($whatsapp_cloud_api),
+                'api_class' => get_class($whatsapp_cloud_api),
                 'to' => $to,
                 'message_length' => strlen($message),
                 'buttons_count' => count($buttons)
@@ -3860,11 +3872,26 @@ trait WhatsApp
 
             // Send using WhatsApp Cloud API sendRequest method
             try {
+                $this->logFlowDebug('Quick Replies: About to make API call', [
+                    'endpoint' => '/' . $phoneNumberId . '/messages',
+                    'payload_size' => strlen(json_encode($payload))
+                ]);
+
+                $startTime = microtime(true);
+                
                 $response = $whatsapp_cloud_api->sendRequest(
                     'POST',
                     '/' . $phoneNumberId . '/messages',
                     $payload
                 );
+                
+                $endTime = microtime(true);
+                $duration = round(($endTime - $startTime) * 1000, 2); // milliseconds
+                
+                $this->logFlowDebug('Quick Replies: API call completed', [
+                    'duration_ms' => $duration,
+                    'response_object_type' => get_class($response)
+                ]);
                 
                 $responseBody = $response->body();
                 $responseCode = $response->httpStatusCode();
