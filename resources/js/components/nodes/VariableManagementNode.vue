@@ -39,7 +39,7 @@
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500"
             />
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Use lowercase with underscores. Will be accessible as {{{{ nodeData.variableName || 'variable_name' }}}}
+              Use lowercase with underscores. Will be accessible as <span v-text="`{{${nodeData.variableName || 'variable_name'}}}`"></span>
             </p>
           </div>
 
@@ -56,7 +56,7 @@
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none focus:ring-2 focus:ring-blue-500"
             ></textarea>
             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              You can use other variables: {{contact_name}}, {{last_message}}, etc.
+              You can use other variables: <span v-text="'{{contact_name}}, {{last_message}}'"></span>, etc.
             </p>
           </div>
 
