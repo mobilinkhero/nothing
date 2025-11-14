@@ -18,6 +18,59 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'landingPage'])->name('home');
 
+// Debug log viewer route
+Route::get('/debug-flow-logs', function () {
+    $logFile = base_path('botflow_save_debug.log');
+    
+    if (!file_exists($logFile)) {
+        return response('<h1>No Debug Logs Found</h1><p>Log file: botflow_save_debug.log does not exist yet.</p><p>Try saving a flow first to generate logs.</p>');
+    }
+    
+    $logs = file_get_contents($logFile);
+    $logs = htmlspecialchars($logs);
+    
+    return response('<!DOCTYPE html>
+<html>
+<head>
+    <title>Flow Save Debug Logs</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: #007cba; color: white; padding: 15px; margin: -20px -20px 20px -20px; border-radius: 5px 5px 0 0; }
+        .logs { background: #000; color: #00ff00; padding: 15px; border-radius: 5px; white-space: pre-wrap; overflow-x: auto; }
+        .clear-btn { background: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; }
+        .clear-btn:hover { background: #c82333; }
+        .refresh-btn { background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 20px; margin-left: 10px; }
+        .refresh-btn:hover { background: #218838; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Flow Save Debug Logs</h1>
+            <p>Live debugging for BotFlow save operations</p>
+        </div>
+        <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Logs</button>
+        <button class="clear-btn" onclick="if(confirm(\'Clear all logs?\')) { fetch(\'/clear-debug-logs\', {method:\'POST\'}).then(() => location.reload()); }">🗑️ Clear Logs</button>
+        <div class="logs">' . $logs . '</div>
+    </div>
+    <script>
+        // Auto refresh every 10 seconds
+        setTimeout(() => location.reload(), 10000);
+    </script>
+</body>
+</html>');
+})->name('debug.flow.logs');
+
+// Clear debug logs route
+Route::post('/clear-debug-logs', function () {
+    $logFile = base_path('botflow_save_debug.log');
+    if (file_exists($logFile)) {
+        file_put_contents($logFile, '');
+    }
+    return response()->json(['success' => true]);
+})->name('clear.debug.logs');
+
 Route::get('/validate', [InstallController::class, 'validate'])->name('validate');
 Route::post('/validate', [InstallController::class, 'validateLicense'])->name('validate.license');
 

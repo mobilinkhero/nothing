@@ -86,6 +86,26 @@ class BotFlowController extends Controller
 
     public function save(Request $request, $subdomain)
     {
+        // Debug logging to home directory
+        $this->logToHomeDirectory('BotFlow Save Request', [
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'tenant_id' => tenant_id(),
+            'request_data' => $request->all(),
+            'has_flow_data' => $request->has('flow_data'),
+            'has_name' => $request->has('name'),
+            'has_id' => $request->has('id'),
+            'id_value' => $request->id
+        ]);
+
+        \Log::info('BotFlow Save Request', [
+            'tenant_id' => tenant_id(),
+            'request_data' => $request->all(),
+            'has_flow_data' => $request->has('flow_data'),
+            'has_name' => $request->has('name'),
+            'has_id' => $request->has('id'),
+            'id_value' => $request->id
+        ]);
+
         // Check if this is a flow data save (only id and flow_data) vs name/description save
         $isFlowDataSave = $request->has('flow_data') && ! $request->has('name');
 
@@ -104,6 +124,18 @@ class BotFlowController extends Controller
         }
 
         if ($validator->fails()) {
+            $this->logToHomeDirectory('BotFlow Save Validation FAILED', [
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'errors' => $validator->errors()->toArray(),
+                'request_data' => $request->all(),
+                'validation_type' => $isFlowDataSave ? 'Flow Data Save' : 'Name/Description Save'
+            ]);
+
+            \Log::error('BotFlow Save Validation Failed', [
+                'errors' => $validator->errors()->toArray(),
+                'request_data' => $request->all()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => $validator->errors()->first(),
@@ -165,6 +197,21 @@ class BotFlowController extends Controller
             $message = t('flow_created_successfully');
         }
 
+        $this->logToHomeDirectory('BotFlow Save SUCCESS', [
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'flow_id' => $flow->id,
+            'tenant_id' => $flow->tenant_id,
+            'message' => $message,
+            'flow_name' => $flow->name ?? 'N/A',
+            'is_active' => $flow->is_active
+        ]);
+
+        \Log::info('BotFlow Save Success', [
+            'flow_id' => $flow->id,
+            'tenant_id' => $flow->tenant_id,
+            'message' => $message
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => $message,
@@ -199,5 +246,37 @@ class BotFlowController extends Controller
             'success' => true,
             'message' => t('flow_deleted_successfully'),
         ]);
+    }
+
+    /**
+     * Log debugging information to home directory
+     */
+    private function logToHomeDirectory($title, $data = [])
+    {
+        try {
+            $logFile = base_path('botflow_save_debug.log');
+            $timestamp = now()->format('Y-m-d H:i:s');
+            
+            $logEntry = "================================================================================\n";
+            $logEntry .= "[{$timestamp}] {$title}\n";
+            $logEntry .= "================================================================================\n";
+            
+            foreach ($data as $key => $value) {
+                if (is_array($value) || is_object($value)) {
+                    $logEntry .= strtoupper($key) . ":\n";
+                    $logEntry .= json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n\n";
+                } else {
+                    $logEntry .= strtoupper($key) . ": " . $value . "\n";
+                }
+            }
+            
+            $logEntry .= "================================================================================\n\n";
+            
+            file_put_contents($logFile, $logEntry, FILE_APPEND);
+            
+        } catch (\Exception $e) {
+            // Silently fail if logging fails
+            \Log::error('Home directory logging failed', ['error' => $e->getMessage()]);
+        }
     }
 }
