@@ -221,8 +221,18 @@ class BotFlowController extends Controller
 
     public function get($subdomain, $id)
     {
-
         $flow = BotFlow::where('tenant_id', tenant_id())->findOrFail($id);
+
+        // Debug logging for flow loading
+        $this->logToHomeDirectory('BotFlow Load Request', [
+            'timestamp' => now()->format('Y-m-d H:i:s'),
+            'flow_id' => $id,
+            'tenant_id' => tenant_id(),
+            'flow_name' => $flow->name,
+            'flow_data_length' => strlen($flow->flow_data ?? ''),
+            'flow_data_preview' => substr($flow->flow_data ?? '', 0, 200) . '...',
+            'has_flow_data' => !empty($flow->flow_data)
+        ]);
 
         return response()->json([
             'success' => true,
