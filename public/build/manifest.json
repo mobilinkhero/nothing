@@ -73,7 +73,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DbBdNesf.js",
+    "file": "assets/app-DqrLlPfZ.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -85,7 +85,7 @@
       "node_modules/intl-tel-input/build/js/utils.js"
     ],
     "css": [
-      "assets/app-DimCd8g5.css"
+      "assets/app-Df3XGdNs.css"
     ]
   },
   "resources/js/tenant-app.js": {

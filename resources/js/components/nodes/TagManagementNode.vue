@@ -4,7 +4,7 @@
       :id="id"
       :selected="selected"
       title="Tag Management"
-      icon="🏷️"
+      :icon="IconComponent"
       :data="nodeData"
     >
       <template #content>
@@ -230,9 +230,14 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, watch, h } from 'vue'
 import { Handle } from '@vue-flow/core'
 import NodeWrapper from '../ui/NodeWrapper.vue'
+import { BsTagsFill } from '@kalimahapps/vue-icons'
+
+const IconComponent = {
+  render: () => h(BsTagsFill, { class: 'w-5 h-5' })
+}
 
 const props = defineProps({
   id: String,
