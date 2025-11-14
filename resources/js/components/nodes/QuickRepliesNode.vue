@@ -239,18 +239,37 @@ function updateNode() {
     console.warn('Quick Replies: At least one reply option is required')
   }
 
+  console.log('QuickReplies: Updating node data', {
+    message: nodeData.message,
+    hasMessage,
+    hasReplies,
+    isValid: nodeData.isValid
+  })
+
   emit('update-node', {
     id: props.id,
     data: { ...nodeData }
   })
 }
 
-// Watch for external data changes
+// Watch for external data changes (only when not user editing)
 watch(() => props.data, (newData) => {
-  if (newData) {
-    Object.assign(nodeData, newData)
+  if (newData && newData !== nodeData) {
+    // Only update if it's genuinely different external data
+    // Avoid overwriting during user input
+    const hasChanges = Object.keys(newData).some(key => {
+      if (key === 'replies') {
+        return JSON.stringify(newData[key]) !== JSON.stringify(nodeData[key])
+      }
+      return newData[key] !== nodeData[key]
+    })
+    
+    if (hasChanges) {
+      console.log('QuickReplies: Updating from external data', newData)
+      Object.assign(nodeData, newData)
+    }
   }
-}, { deep: true })
+}, { deep: true, immediate: false })
 </script>
 
 <style scoped>

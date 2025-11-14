@@ -3848,67 +3848,129 @@ trait WhatsApp
                 ]);
             }
 
-            // Use the same approach as other working nodes
-            try {
-                $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
-                
-                $this->logFlowDebug('Quick Replies: Using sendRequest like other nodes', [
-                    'api_loaded' => !empty($whatsapp_cloud_api),
-                    'to' => $to,
-                    'message_length' => strlen($message),
-                    'buttons_count' => count($buttons)
+            // Load WhatsApp Cloud API config
+            $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
+            
+            if (!$whatsapp_cloud_api) {
+                $this->logFlowDebug('Quick Replies: API config failed to load', [
+                    'phoneNumberId' => $phoneNumberId
                 ]);
-
-                // Use the same pattern as sendFlowButtonMessage
-                $result = $whatsapp_cloud_api->sendRequest(
-                    'POST',
-                    '/' . $phoneNumberId . '/messages',
-                    $payload
-                );
-
-                $this->logFlowDebug('Quick Replies: API Response received', [
-                    'status_code' => $result->httpStatusCode(),
-                    'body_length' => strlen($result->body())
-                ]);
-
-                $response = [
-                    'status' => true,
-                    'data' => json_decode($result->body()),
-                    'responseCode' => $result->httpStatusCode(),
-                    'responseData' => $result->decodedBody(),
-                ];
-
-                if ($result->httpStatusCode() >= 400) {
-                    $response['status'] = false;
-                    $response['message'] = 'WhatsApp API error: ' . $result->httpStatusCode();
-                    
-                    $this->logFlowDebug('Quick Replies: API Error', [
-                        'status_code' => $result->httpStatusCode(),
-                        'response_body' => $result->body()
-                    ]);
-                } else {
-                    $response['message'] = 'Quick replies sent successfully';
-                    
-                    $this->logFlowDebug('Quick Replies: Success', [
-                        'status_code' => $result->httpStatusCode(),
-                        'message_sent' => true
-                    ]);
-                }
-
-                return $response;
-
-            } catch (\Exception $e) {
-                $this->logFlowDebug('Quick Replies: Exception caught', [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-
                 return [
                     'status' => false,
-                    'message' => 'Error sending quick replies: ' . $e->getMessage(),
-                    'responseCode' => 500,
+                    'message' => 'WhatsApp API configuration failed to load',
+                    'responseCode' => 500
                 ];
             }
+            
+            $this->logFlowDebug('Quick Replies: Sending via API', [
+                'api_loaded' => !empty($whatsapp_cloud_api),
+                'api_class' => get_class($whatsapp_cloud_api),
+                'to' => $to,
+                'message_length' => strlen($message),
+                'buttons_count' => count($buttons)
+            ]);
+
+            // Send using WhatsApp Cloud API sendRequest method
+            try {
+                $this->logFlowDebug('Quick Replies: About to make API call', [
+                    'endpoint' => '/' . $phoneNumberId . '/messages',
+                    'payload_size' => strlen(json_encode($payload))
+                ]);
+
+                $startTime = microtime(true);
+                
+                // Set timeout for the API call (30 seconds max)
+                $timeout = 30;
+                
+                // Add timeout handling to prevent hanging
+                $timeoutReached = false;
+                $response = null;
+                
+                // Use timeout with signal handling
+                $oldHandler = set_error_handler(function() use (&$timeoutReached) {
+                    $timeoutReached = true;
+                });
+                
+                try {
+                    // Set execution time limit
+                    $maxExecutionTime = 30; // seconds
+                    $timeoutTime = time() + $maxExecutionTime;
+                    
+                    $this->logFlowDebug('Quick Replies: Attempting sendRequest with timeout', [
+                        'timeout_seconds' => $maxExecutionTime
+                    ]);
+                    
+                    $response = $whatsapp_cloud_api->sendRequest(
+                        'POST',
+                        '/' . $phoneNumberId . '/messages',
+                        $payload
+                    );
+                    
+                    $endTime = microtime(true);
+                    
+                    if ($response === null || $timeoutReached || time() > $timeoutTime) {
+                        throw new \Exception('API call timed out or returned null');
+                    }
+                    
+                } catch (\Exception $requestException) {
+                    $endTime = microtime(true);
+                    $this->logFlowDebug('Quick Replies: SendRequest failed, using direct cURL', [
+                        'error' => $requestException->getMessage(),
+                        'duration_ms' => round(($endTime - $startTime) * 1000, 2),
+                        'timeout_reached' => $timeoutReached
+                    ]);
+                    
+                    // Fallback to direct cURL call
+                    $response = $this->sendDirectWhatsAppRequest($phoneNumberId, $payload);
+                    $endTime = microtime(true);
+                }
+                
+                restore_error_handler();
+                $duration = round(($endTime - $startTime) * 1000, 2); // milliseconds
+                
+                $this->logFlowDebug('Quick Replies: API call completed', [
+                    'duration_ms' => $duration,
+                    'response_object_type' => get_class($response)
+                ]);
+                
+                $responseBody = $response->body();
+                $responseCode = $response->httpStatusCode();
+                
+                $this->logFlowDebug('Quick Replies: Raw API Response', [
+                    'response_code' => $responseCode,
+                    'response_body' => $responseBody,
+                    'response_length' => strlen($responseBody)
+                ]);
+                
+                $result = [
+                    'status' => $responseCode >= 200 && $responseCode < 300,
+                    'data' => json_decode($responseBody, true),
+                    'responseCode' => $responseCode,
+                    'message' => $responseCode >= 200 && $responseCode < 300 
+                        ? 'Quick replies sent successfully' 
+                        : 'Failed to send quick replies: HTTP ' . $responseCode
+                ];
+                
+            } catch (\Exception $apiException) {
+                $this->logFlowDebug('Quick Replies: API Exception', [
+                    'error' => $apiException->getMessage(),
+                    'trace' => $apiException->getTraceAsString()
+                ]);
+                
+                $result = [
+                    'status' => false,
+                    'responseCode' => 0,
+                    'message' => 'API Exception: ' . $apiException->getMessage(),
+                    'data' => null
+                ];
+            }
+            
+            $this->logFlowDebug('Quick Replies: Final Result', [
+                'result' => $result,
+                'success' => $result['status']
+            ]);
+
+            return $result;
 
         } catch (\Exception $e) {
             $this->logFlowDebug('Quick Replies: EXCEPTION', [
