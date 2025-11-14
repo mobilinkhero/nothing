@@ -628,14 +628,47 @@ function showNotification(message, type = "info") {
         })
     );
 }
+
+// Handle node validation updates
 function handleTextNodeValidation(nodeId, isValid) {
+    console.log('Flow Builder: Validation update', { nodeId, isValid });
+    
     // Find the node in our nodes array
     const node = initialNodes.value.find((n) => n.id === nodeId);
     if (node) {
-        // Update the node data with the validation state
+        // Update the node's validation status
         node.data.isValid = isValid;
-        // Update the overall flow validation
-        updateFlowValidity();
+        console.log('Flow Builder: Node validation updated', {
+            nodeId,
+            isValid,
+            nodeData: node.data
+        });
+    }
+    // After updating validation, validate the entire workflow
+    isFlowValid.value = validateWorkflow();
+}
+
+// Handle node data updates
+function updateNodeData(nodeUpdate) {
+    console.log('Flow Builder: Updating node data', nodeUpdate);
+    
+    // Find the node in our nodes array
+    const node = initialNodes.value.find((n) => n.id === nodeUpdate.id);
+    if (node) {
+        // Update the node's data
+        Object.assign(node.data, nodeUpdate.data);
+        console.log('Flow Builder: Node data updated', {
+            nodeId: nodeUpdate.id,
+            newData: node.data
+        });
+        
+        // Trigger reactivity
+        initialNodes.value = [...initialNodes.value];
+        
+        // Validate workflow after data update
+        isFlowValid.value = validateWorkflow();
+    } else {
+        console.warn('Flow Builder: Node not found for update', nodeUpdate.id);
     }
 }
 
@@ -1095,6 +1128,45 @@ function getReplyTypeText(type) {
                                         $event
                                     )
                                 "
+                            />
+                        </template>
+
+                        <template #node-quickReplies="nodeProps">
+                            <QuickRepliesNode
+                                v-bind="nodeProps"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                                @update-node="updateNodeData"
+                            />
+                        </template>
+
+                        <template #node-tagManagement="nodeProps">
+                            <TagManagementNode
+                                v-bind="nodeProps"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                                @update-node="updateNodeData"
+                            />
+                        </template>
+
+                        <template #node-variableManagement="nodeProps">
+                            <VariableManagementNode
+                                v-bind="nodeProps"
+                                @update:isValid="
+                                    handleTextNodeValidation(
+                                        nodeProps.id,
+                                        $event
+                                    )
+                                "
+                                @update-node="updateNodeData"
                             />
                         </template>
 
