@@ -38,7 +38,11 @@ import {
   BsChatRightQuote,
   AkArrowLeft,
   AkArrowRight,
-  AkLinkOn
+  AkLinkOn,
+  // Phase 1 New Node Icons
+  BsGearFill,
+  MdAccessTime,
+  HiDocumentText
 } from "@kalimahapps/vue-icons";
 
 
@@ -190,6 +194,22 @@ const nodeTemplates = reactive([
         label: "API Request",
         icon: CaHttp,
     },
+    // Phase 1 New Nodes
+    {
+        type: "condition",
+        label: "Condition",
+        icon: BsGearFill,
+    },
+    {
+        type: "delay",
+        label: "Delay",
+        icon: MdAccessTime,
+    },
+    {
+        type: "inputCollection",
+        label: "Input Collection",
+        icon: HiDocumentText,
+    },
 ]);
 
 // Group node templates by category
@@ -202,6 +222,7 @@ const nodeCategories = computed(() => {
             "locationMessage",
             "contactMessage",
         ],
+        "Flow Control": ["condition", "delay", "inputCollection"],
         "Advanced Features": aiAssistantEnabled.value
             ? ["aiAssistant", "webhookApi"]
             : ["webhookApi"],
@@ -288,6 +309,47 @@ function addNodeAtPosition(type, position) {
                         requestBody: [{ key: "", value: "" }],
                     },
                 ],
+            };
+            break;
+        case "condition":
+            nodeData = {
+                conditions: [
+                    {
+                        variable: '',
+                        customVariable: '',
+                        operator: 'equals',
+                        value: '',
+                        logic: 'AND'
+                    }
+                ],
+                defaultAction: 'continue'
+            };
+            break;
+        case "delay":
+            nodeData = {
+                delayType: 'fixed',
+                duration: 3,
+                unit: 'seconds',
+                showTyping: true
+            };
+            break;
+        case "inputCollection":
+            nodeData = {
+                message: 'Please provide the following information:',
+                fields: [
+                    {
+                        type: 'text',
+                        variable: 'user_name',
+                        label: 'What is your name?',
+                        required: true,
+                        minLength: 2,
+                        errorMessage: 'Please enter a valid name',
+                        options: ''
+                    }
+                ],
+                collectionMode: 'sequential',
+                maxRetries: 3,
+                skipOnError: false
             };
             break;
         // Update other node types similarly...

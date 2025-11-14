@@ -16,7 +16,7 @@ import BotFlowBuilder from "./components/BotFlowBuilder.vue";
 
 import ThemeStyleSettings from "../js/theme/components/ThemeStyleSettings.vue";
 import ThemeStyleSwatch from "../js/theme/components/ThemeStyleSwatch.vue";
-import WhatsAppTemplateManager from "../js/dynamic-template/components/WhatsAppTemplateManager.vue";
+// import WhatsAppTemplateManager from "../js/dynamic-template/components/WhatsAppTemplateManager.vue";
 
 // Import Vue Select
 import vSelect from "vue-select";
@@ -32,13 +32,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // dynamic templates
-    if (document.getElementById("dynamic-templates")) {
-        const app = createApp({});
-        app.component("v-select", vSelect);
-        app.component("whatsapp-template-manager", WhatsAppTemplateManager);
+    // if (document.getElementById("dynamic-templates")) {
+    //     const app = createApp({});
+    //     app.component("v-select", vSelect);
+    //     app.component("whatsapp-template-manager", WhatsAppTemplateManager);
 
-        app.mount("#dynamic-templates");
-    }
+    //     app.mount("#dynamic-templates");
+    // }
     // Initialize theme style app if element exists
     if (document.getElementById("theme-style-app")) {
         const app = createApp({});
