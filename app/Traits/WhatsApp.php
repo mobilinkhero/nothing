@@ -3848,89 +3848,67 @@ trait WhatsApp
                 ]);
             }
 
-            // Load WhatsApp Cloud API config
-            $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
-            
-            if (!$whatsapp_cloud_api) {
-                $this->logFlowDebug('Quick Replies: API config failed to load', [
-                    'phoneNumberId' => $phoneNumberId
-                ]);
-                return [
-                    'status' => false,
-                    'message' => 'WhatsApp API configuration failed to load',
-                    'responseCode' => 500
-                ];
-            }
-            
-            $this->logFlowDebug('Quick Replies: Sending via API', [
-                'api_loaded' => !empty($whatsapp_cloud_api),
-                'api_class' => get_class($whatsapp_cloud_api),
-                'to' => $to,
-                'message_length' => strlen($message),
-                'buttons_count' => count($buttons)
-            ]);
-
-            // Send using WhatsApp Cloud API sendRequest method
+            // Use the same approach as other working nodes
             try {
-                $this->logFlowDebug('Quick Replies: About to make API call', [
-                    'endpoint' => '/' . $phoneNumberId . '/messages',
-                    'payload_size' => strlen(json_encode($payload))
+                $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
+                
+                $this->logFlowDebug('Quick Replies: Using sendRequest like other nodes', [
+                    'api_loaded' => !empty($whatsapp_cloud_api),
+                    'to' => $to,
+                    'message_length' => strlen($message),
+                    'buttons_count' => count($buttons)
                 ]);
 
-                $startTime = microtime(true);
-                
-                $response = $whatsapp_cloud_api->sendRequest(
+                // Use the same pattern as sendFlowButtonMessage
+                $result = $whatsapp_cloud_api->sendRequest(
                     'POST',
                     '/' . $phoneNumberId . '/messages',
                     $payload
                 );
-                
-                $endTime = microtime(true);
-                $duration = round(($endTime - $startTime) * 1000, 2); // milliseconds
-                
-                $this->logFlowDebug('Quick Replies: API call completed', [
-                    'duration_ms' => $duration,
-                    'response_object_type' => get_class($response)
+
+                $this->logFlowDebug('Quick Replies: API Response received', [
+                    'status_code' => $result->httpStatusCode(),
+                    'body_length' => strlen($result->body())
                 ]);
-                
-                $responseBody = $response->body();
-                $responseCode = $response->httpStatusCode();
-                
-                $this->logFlowDebug('Quick Replies: Raw API Response', [
-                    'response_code' => $responseCode,
-                    'response_body' => $responseBody,
-                    'response_length' => strlen($responseBody)
-                ]);
-                
-                $result = [
-                    'status' => $responseCode >= 200 && $responseCode < 300,
-                    'data' => json_decode($responseBody, true),
-                    'responseCode' => $responseCode,
-                    'message' => $responseCode >= 200 && $responseCode < 300 
-                        ? 'Quick replies sent successfully' 
-                        : 'Failed to send quick replies: HTTP ' . $responseCode
+
+                $response = [
+                    'status' => true,
+                    'data' => json_decode($result->body()),
+                    'responseCode' => $result->httpStatusCode(),
+                    'responseData' => $result->decodedBody(),
                 ];
-                
-            } catch (\Exception $apiException) {
-                $this->logFlowDebug('Quick Replies: API Exception', [
-                    'error' => $apiException->getMessage(),
-                    'trace' => $apiException->getTraceAsString()
+
+                if ($result->httpStatusCode() >= 400) {
+                    $response['status'] = false;
+                    $response['message'] = 'WhatsApp API error: ' . $result->httpStatusCode();
+                    
+                    $this->logFlowDebug('Quick Replies: API Error', [
+                        'status_code' => $result->httpStatusCode(),
+                        'response_body' => $result->body()
+                    ]);
+                } else {
+                    $response['message'] = 'Quick replies sent successfully';
+                    
+                    $this->logFlowDebug('Quick Replies: Success', [
+                        'status_code' => $result->httpStatusCode(),
+                        'message_sent' => true
+                    ]);
+                }
+
+                return $response;
+
+            } catch (\Exception $e) {
+                $this->logFlowDebug('Quick Replies: Exception caught', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
                 ]);
-                
-                $result = [
+
+                return [
                     'status' => false,
-                    'responseCode' => 0,
-                    'message' => 'API Exception: ' . $apiException->getMessage(),
-                    'data' => null
+                    'message' => 'Error sending quick replies: ' . $e->getMessage(),
+                    'responseCode' => 500,
                 ];
             }
-            
-            $this->logFlowDebug('Quick Replies: Final Result', [
-                'result' => $result,
-                'success' => $result['status']
-            ]);
-
-            return $result;
 
         } catch (\Exception $e) {
             $this->logFlowDebug('Quick Replies: EXCEPTION', [
@@ -4233,5 +4211,65 @@ trait WhatsApp
                 // Complete silence if even Laravel logging fails
             }
         }
+    }
+
+    /**
+     * Direct cURL fallback for WhatsApp API when sendRequest hangs
+     */
+    private function sendDirectWhatsAppRequest($phoneNumberId, $payload)
+    {
+        $this->logFlowDebug('Direct cURL: Starting', ['phoneNumberId' => $phoneNumberId]);
+        
+        // Get access token from environment or config
+        $accessToken = env('WHATSAPP_TOKEN') ?? config('whatsapp.token');
+        $version = env('WHATSAPP_VERSION', 'v17.0');
+        
+        $url = "https://graph.facebook.com/{$version}/{$phoneNumberId}/messages";
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $accessToken,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT => 'WhatsApp-Flow-Builder/1.0'
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        $this->logFlowDebug('Direct cURL: Response', [
+            'http_code' => $httpCode,
+            'curl_error' => $curlError,
+            'response_length' => strlen($response)
+        ]);
+        
+        // Create a response object similar to what sendRequest returns
+        return new class($response, $httpCode) {
+            private $body;
+            private $code;
+            
+            public function __construct($body, $code) {
+                $this->body = $body;
+                $this->code = $code;
+            }
+            
+            public function body() {
+                return $this->body;
+            }
+            
+            public function httpStatusCode() {
+                return $this->code;
+            }
+        };
     }
 }
