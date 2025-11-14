@@ -241,17 +241,12 @@ async function uploadFileToServer(file) {
 
     // Update with the public URL received from Laravel
     if (data && data.url) {
-      console.log('Upload successful, received URL:', data.url);
       mediaUrl.value = data.url; // This will be a public URL, not a blob
-      // Clear the uploaded file since we now have a server URL
-      // uploadedFile.value = null; // Don't clear this yet for debugging
       updateNodeData();
     } else {
-      console.error('Invalid response from server:', data);
       throw new Error('Invalid response from server');
     }
   } catch (error) {
-    console.error('Upload failed:', error);
     uploadError.value = error.message || 'Failed to upload file. Please try again.';
   } finally {
     isUploading.value = false;
@@ -345,11 +340,20 @@ const mediaPreview = computed(() => {
     sourceUrl = URL.createObjectURL(uploadedFile.value);
   }
   
-  if (!sourceUrl) return null;
+  if (!sourceUrl) {
+    return `<div class="text-sm text-gray-500">No media to preview</div>`;
+  }
 
   switch (mediaType.value) {
     case 'image':
-      return `<img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" onload="this.style.display='block'; if(this.nextElementSibling) this.nextElementSibling.style.display='none';"/><div style="display:none;" class="text-sm text-gray-500">Image preview unavailable</div>`;
+      return `<div>
+                <img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded" 
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" 
+                     onload="this.style.display='block'; if(this.nextElementSibling) this.nextElementSibling.style.display='none';"/>
+                <div style="display:none;" class="text-sm text-red-500">
+                  Image preview unavailable
+                </div>
+              </div>`;
     case 'video':
       return `<video controls class="max-h-32 max-w-full rounded">
                 <source src="${sourceUrl}" type="video/mp4">
