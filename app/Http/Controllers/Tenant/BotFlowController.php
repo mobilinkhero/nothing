@@ -54,21 +54,29 @@ class BotFlowController extends Controller
             // Generate a unique filename
             $filename = Str::uuid().'.'.$extension;
 
-            // Define the storage path based on media type
-            $path = "bot_flow/{$request->type}s"; // e.g., images, videos, audios, documents
+            // Define the storage path in bot_media directory (directly accessible)
+            $mediaTypeFolder = $request->type === 'document' ? 'documents' : $request->type.'s'; // images, videos, audios, documents
+            $botMediaPath = "bot_media/{$mediaTypeFolder}";
+            
+            // Create directory if it doesn't exist
+            $fullPath = public_path($botMediaPath);
+            if (!file_exists($fullPath)) {
+                mkdir($fullPath, 0755, true);
+            }
 
-            // Store the file in the public disk
-            $storedPath = $file->storeAs($path, $filename, 'public');
+            // Store the file directly in public bot_media folder
+            $destinationPath = public_path($botMediaPath);
+            $moved = $file->move($destinationPath, $filename);
 
             // Verify the file was stored successfully
-            if (! $storedPath) {
+            if (! $moved) {
                 return response()->json([
                     'message' => 'File upload failed',
                 ], 500);
             }
 
-            // Generate the public URL for the file
-            $url = Storage::disk('public')->url($storedPath);
+            // Generate the public URL for the file (directly accessible)
+            $url = url("{$botMediaPath}/{$filename}");
 
             // Return the URL to the frontend
             return response()->json([
