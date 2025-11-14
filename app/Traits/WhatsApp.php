@@ -1408,6 +1408,15 @@ trait WhatsApp
             case 'webhookApi':
                 return $this->sendFlowWebhookApi($nodeData, $phoneNumberId, $contactData, $context);
 
+            case 'condition':
+                return $this->processFlowCondition($nodeData, $phoneNumberId, $contactData, $context);
+
+            case 'delay':
+                return $this->processFlowDelay($nodeData, $phoneNumberId, $contactData, $context);
+
+            case 'inputCollection':
+                return $this->processFlowInputCollection($to, $nodeData, $phoneNumberId, $contactData, $context);
+
             default:
                 return ['status' => false, 'message' => 'Unsupported node type: '.$nodeType];
         }
@@ -2023,6 +2032,167 @@ trait WhatsApp
         ];
 
         return $this->sendMessage($to, $messageData, $phoneNumberId);
+    }
+
+    /**
+     * Generate AI response for flow context
+     */
+    protected function generateFlowAiResponse($prompt, $aiModel, $contextType, $context)
+    {
+        try {
+            // Check if AI is enabled
+            $aiEnabled = get_tenant_setting_from_db('whats-mark', 'enable_openai_in_chat');
+            if (!$aiEnabled) {
+                whatsapp_log('AI not enabled for tenant', 'warning', [
+                    'tenant_id' => $this->wa_tenant_id,
+                ]);
+                return false;
+            }
+
+            // Get AI configuration
+            $openAiKey = get_tenant_setting_from_db('whats-mark', 'openai_secret_key');
+            $configuredModel = get_tenant_setting_from_db('whats-mark', 'chat_model') ?: 'gpt-3.5-turbo';
+            
+            if (empty($openAiKey)) {
+                whatsapp_log('OpenAI API key not configured', 'error', [
+                    'tenant_id' => $this->wa_tenant_id,
+                ]);
+                return false;
+            }
+
+            // Use the configured model or the one specified in the node
+            $model = $aiModel ?: $configuredModel;
+
+            // Prepare the conversation context
+            $messages = [];
+            
+            // Add system prompt
+            if (!empty($prompt)) {
+                $messages[] = [
+                    'role' => 'system',
+                    'content' => $prompt
+                ];
+            }
+
+            // Add context based on context type
+            switch ($contextType) {
+                case 'conversation':
+                    // Get recent conversation history (implement as needed)
+                    $conversationHistory = $this->getRecentConversationHistory($context);
+                    foreach ($conversationHistory as $msg) {
+                        $messages[] = $msg;
+                    }
+                    break;
+                    
+                case 'flow':
+                    // Add flow context information
+                    $flowContext = $this->buildFlowContext($context);
+                    if (!empty($flowContext)) {
+                        $messages[] = [
+                            'role' => 'system',
+                            'content' => "Flow context: " . $flowContext
+                        ];
+                    }
+                    break;
+                    
+                case 'message':
+                default:
+                    // Add the trigger message if available
+                    if (!empty($context['trigger_message'])) {
+                        $messages[] = [
+                            'role' => 'user',
+                            'content' => $context['trigger_message']
+                        ];
+                    }
+                    break;
+            }
+
+            // If no user message in context, add a generic prompt
+            if (empty($context['trigger_message'])) {
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => 'Please provide assistance based on the system prompt.'
+                ];
+            }
+
+            // Initialize OpenAI client
+            $config = new \LLPhant\OpenAIConfig();
+            $config->apiKey = $openAiKey;
+            $config->model = $model;
+
+            $chat = new \LLPhant\Chat\OpenAIChat($config);
+            
+            // Generate response
+            $response = $chat->generateChat($messages);
+
+            whatsapp_log('AI response generated successfully', 'info', [
+                'model' => $model,
+                'context_type' => $contextType,
+                'prompt_length' => strlen($prompt),
+                'response_length' => strlen($response),
+                'tenant_id' => $this->wa_tenant_id,
+            ]);
+
+            return $response;
+
+        } catch (\Throwable $e) {
+            whatsapp_log('AI response generation failed', 'error', [
+                'error' => $e->getMessage(),
+                'model' => $aiModel,
+                'context_type' => $contextType,
+                'tenant_id' => $this->wa_tenant_id,
+            ], $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Get recent conversation history for AI context
+     */
+    protected function getRecentConversationHistory($context, $limit = 10)
+    {
+        // This is a placeholder - implement based on your message storage system
+        // You might want to query your messages table here
+        $messages = [];
+        
+        // Example implementation:
+        // $recentMessages = Message::where('chat_id', $context['chat_id'])
+        //     ->orderBy('created_at', 'desc')
+        //     ->limit($limit)
+        //     ->get()
+        //     ->reverse();
+        //
+        // foreach ($recentMessages as $msg) {
+        //     $messages[] = [
+        //         'role' => $msg->from_user ? 'user' : 'assistant',
+        //         'content' => $msg->message
+        //     ];
+        // }
+
+        return $messages;
+    }
+
+    /**
+     * Build flow context information for AI
+     */
+    protected function buildFlowContext($context)
+    {
+        $contextInfo = [];
+        
+        if (!empty($context['flow_id'])) {
+            $contextInfo[] = "Flow ID: " . $context['flow_id'];
+        }
+        
+        if (!empty($context['current_node'])) {
+            $contextInfo[] = "Current Node: " . $context['current_node'];
+        }
+        
+        if (!empty($context['user_variables'])) {
+            $contextInfo[] = "User Variables: " . json_encode($context['user_variables']);
+        }
+
+        return implode(', ', $contextInfo);
     }
 
     /**
@@ -3192,5 +3362,380 @@ trait WhatsApp
             // Return a basic XML structure if conversion fails
             return "<?xml version=\"1.0\"?><$rootElement><error>XML conversion failed</error></$rootElement>";
         }
+    }
+
+    /**
+     * Process condition node in flow
+     */
+    protected function processFlowCondition($nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $conditions = $nodeData['conditions'] ?? [];
+            $defaultAction = $nodeData['defaultAction'] ?? 'continue';
+            
+            if (empty($conditions)) {
+                return ['status' => false, 'message' => 'No conditions defined'];
+            }
+
+            $result = $this->evaluateConditions($conditions, $contactData, $context);
+            
+            whatsapp_log('Condition evaluation result', 'info', [
+                'node_id' => $context['current_node'] ?? 'unknown',
+                'result' => $result,
+                'conditions_count' => count($conditions),
+            ]);
+
+            return [
+                'status' => true,
+                'condition_result' => $result,
+                'next_path' => $result ? 'true' : 'false',
+                'default_action' => $defaultAction,
+            ];
+
+        } catch (\Throwable $e) {
+            whatsapp_log('Condition processing error', 'error', [
+                'error' => $e->getMessage(),
+                'node_data' => $nodeData,
+            ], $e);
+
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Evaluate multiple conditions with logic operators
+     */
+    protected function evaluateConditions($conditions, $contactData, $context)
+    {
+        if (empty($conditions)) {
+            return false;
+        }
+
+        $results = [];
+        
+        foreach ($conditions as $condition) {
+            $results[] = $this->evaluateSingleCondition($condition, $contactData, $context);
+        }
+
+        // Process logic operators (AND/OR)
+        $finalResult = $results[0];
+        
+        for ($i = 0; $i < count($conditions) - 1; $i++) {
+            $logic = $conditions[$i]['logic'] ?? 'AND';
+            $nextResult = $results[$i + 1];
+            
+            if ($logic === 'OR') {
+                $finalResult = $finalResult || $nextResult;
+            } else { // AND
+                $finalResult = $finalResult && $nextResult;
+            }
+        }
+
+        return $finalResult;
+    }
+
+    /**
+     * Evaluate a single condition
+     */
+    protected function evaluateSingleCondition($condition, $contactData, $context)
+    {
+        $variable = $condition['variable'] ?? '';
+        $operator = $condition['operator'] ?? 'equals';
+        $value = $condition['value'] ?? '';
+        $customVariable = $condition['customVariable'] ?? '';
+
+        // Get the actual value to compare
+        $actualValue = $this->getVariableValue($variable, $customVariable, $contactData, $context);
+
+        // Perform comparison based on operator
+        switch ($operator) {
+            case 'equals':
+                return $actualValue == $value;
+            case 'not_equals':
+                return $actualValue != $value;
+            case 'contains':
+                return stripos($actualValue, $value) !== false;
+            case 'not_contains':
+                return stripos($actualValue, $value) === false;
+            case 'starts_with':
+                return stripos($actualValue, $value) === 0;
+            case 'ends_with':
+                return substr_compare($actualValue, $value, -strlen($value), strlen($value), true) === 0;
+            case 'greater_than':
+                return is_numeric($actualValue) && is_numeric($value) && floatval($actualValue) > floatval($value);
+            case 'less_than':
+                return is_numeric($actualValue) && is_numeric($value) && floatval($actualValue) < floatval($value);
+            case 'is_empty':
+                return empty($actualValue);
+            case 'is_not_empty':
+                return !empty($actualValue);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Get variable value for condition evaluation
+     */
+    protected function getVariableValue($variable, $customVariable, $contactData, $context)
+    {
+        // Handle custom variables
+        if ($variable === 'custom_variable' && !empty($customVariable)) {
+            return $context['variables'][$customVariable] ?? '';
+        }
+
+        // Handle system variables
+        switch ($variable) {
+            case 'contact_name':
+                return $contactData->name ?? '';
+            case 'contact_phone':
+                return $contactData->phone ?? '';
+            case 'contact_email':
+                return $contactData->email ?? '';
+            case 'contact_type':
+                return $contactData->type ?? '';
+            case 'current_time':
+                return now()->format('H:i');
+            case 'day_of_week':
+                return now()->format('l');
+            case 'business_hours':
+                return $this->isBusinessHours() ? 'yes' : 'no';
+            case 'user_message':
+                return $context['trigger_message'] ?? '';
+            default:
+                return $context['variables'][$variable] ?? '';
+        }
+    }
+
+    /**
+     * Check if current time is within business hours
+     */
+    protected function isBusinessHours()
+    {
+        $now = now();
+        $hour = $now->hour;
+        $dayOfWeek = $now->dayOfWeek; // 0 = Sunday, 6 = Saturday
+        
+        // Default business hours: Monday-Friday, 9 AM - 6 PM
+        $isWeekday = $dayOfWeek >= 1 && $dayOfWeek <= 5;
+        $isBusinessHour = $hour >= 9 && $hour < 18;
+        
+        return $isWeekday && $isBusinessHour;
+    }
+
+    /**
+     * Process delay node in flow
+     */
+    protected function processFlowDelay($nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $delayType = $nodeData['delayType'] ?? 'fixed';
+            $delaySeconds = $this->calculateDelaySeconds($nodeData);
+            
+            whatsapp_log('Processing delay node', 'info', [
+                'node_id' => $context['current_node'] ?? 'unknown',
+                'delay_type' => $delayType,
+                'delay_seconds' => $delaySeconds,
+            ]);
+
+            // For immediate processing, we'll return the delay info
+            // The actual delay implementation would depend on your queue system
+            return [
+                'status' => true,
+                'delay_seconds' => $delaySeconds,
+                'delay_type' => $delayType,
+                'show_typing' => $nodeData['showTyping'] ?? true,
+                'message' => "Delay of {$delaySeconds} seconds configured"
+            ];
+
+        } catch (\Throwable $e) {
+            whatsapp_log('Delay processing error', 'error', [
+                'error' => $e->getMessage(),
+                'node_data' => $nodeData,
+            ], $e);
+
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Calculate delay in seconds based on node configuration
+     */
+    protected function calculateDelaySeconds($nodeData)
+    {
+        $delayType = $nodeData['delayType'] ?? 'fixed';
+        
+        switch ($delayType) {
+            case 'fixed':
+                $duration = $nodeData['duration'] ?? 3;
+                $unit = $nodeData['unit'] ?? 'seconds';
+                return $this->convertToSeconds($duration, $unit);
+                
+            case 'random':
+                $minDuration = $nodeData['minDuration'] ?? 1;
+                $maxDuration = $nodeData['maxDuration'] ?? 5;
+                $unit = $nodeData['unit'] ?? 'seconds';
+                $randomDuration = rand($minDuration, $maxDuration);
+                return $this->convertToSeconds($randomDuration, $unit);
+                
+            case 'typing':
+                $messageLength = $nodeData['messageLength'] ?? 100;
+                $typingSpeed = $nodeData['typingSpeed'] ?? 'normal';
+                $wpm = $typingSpeed === 'slow' ? 40 : ($typingSpeed === 'fast' ? 80 : 60);
+                return max(1, ceil(($messageLength / 5) / ($wpm / 60)));
+                
+            case 'scheduled':
+                // For scheduled delays, return a large number to indicate special handling needed
+                return 86400; // 24 hours as placeholder
+                
+            default:
+                return 3;
+        }
+    }
+
+    /**
+     * Convert duration to seconds
+     */
+    protected function convertToSeconds($duration, $unit)
+    {
+        switch ($unit) {
+            case 'minutes':
+                return $duration * 60;
+            case 'hours':
+                return $duration * 3600;
+            case 'days':
+                return $duration * 86400;
+            case 'seconds':
+            default:
+                return $duration;
+        }
+    }
+
+    /**
+     * Process input collection node in flow
+     */
+    protected function processFlowInputCollection($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $message = $nodeData['message'] ?? 'Please provide the following information:';
+            $fields = $nodeData['fields'] ?? [];
+            $collectionMode = $nodeData['collectionMode'] ?? 'sequential';
+            
+            if (empty($fields)) {
+                return ['status' => false, 'message' => 'No input fields defined'];
+            }
+
+            // Replace variables in message
+            $processedMessage = $this->replaceFlowVariables($message, $contactData);
+
+            // For sequential mode, start with the first field
+            if ($collectionMode === 'sequential') {
+                $firstField = $fields[0];
+                $fieldMessage = $this->buildFieldMessage($firstField, $processedMessage);
+                
+                // Send the collection message
+                $messageData = [
+                    'rel_type' => $contactData->type ?? 'guest',
+                    'rel_id' => $contactData->id ?? '',
+                    'reply_text' => $fieldMessage,
+                    'bot_header' => '',
+                    'bot_footer' => '',
+                    'tenant_id' => $this->wa_tenant_id,
+                ];
+
+                $result = $this->sendMessage($to, $messageData, $phoneNumberId);
+                
+                // Log the input collection start
+                $this->logFlowActivity($to, $result, [
+                    'rel_type' => $contactData->type ?? 'guest',
+                    'rel_id' => $contactData->id ?? '',
+                    'collection_mode' => $collectionMode,
+                    'fields_count' => count($fields),
+                    'current_field' => 0,
+                ], 'flow_input_collection_start');
+
+                return array_merge($result, [
+                    'collection_active' => true,
+                    'current_field' => 0,
+                    'total_fields' => count($fields),
+                    'collection_mode' => $collectionMode,
+                ]);
+            }
+            
+            // For form mode, create a comprehensive message
+            else {
+                $formMessage = $this->buildFormMessage($fields, $processedMessage);
+                
+                $messageData = [
+                    'rel_type' => $contactData->type ?? 'guest',
+                    'rel_id' => $contactData->id ?? '',
+                    'reply_text' => $formMessage,
+                    'bot_header' => '',
+                    'bot_footer' => '',
+                    'tenant_id' => $this->wa_tenant_id,
+                ];
+
+                return $this->sendMessage($to, $messageData, $phoneNumberId);
+            }
+
+        } catch (\Throwable $e) {
+            whatsapp_log('Input collection processing error', 'error', [
+                'error' => $e->getMessage(),
+                'node_data' => $nodeData,
+            ], $e);
+
+            return ['status' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Build message for a single field collection
+     */
+    protected function buildFieldMessage($field, $introMessage)
+    {
+        $message = $introMessage . "\n\n";
+        $message .= $field['label'] ?? 'Please enter value:';
+        
+        if ($field['required'] ?? false) {
+            $message .= ' *';
+        }
+        
+        if ($field['type'] === 'choice' && !empty($field['options'])) {
+            $options = explode("\n", $field['options']);
+            $message .= "\n\nOptions:";
+            foreach ($options as $index => $option) {
+                $message .= "\n" . ($index + 1) . ". " . trim($option);
+            }
+        }
+
+        return $message;
+    }
+
+    /**
+     * Build comprehensive form message for all fields
+     */
+    protected function buildFormMessage($fields, $introMessage)
+    {
+        $message = $introMessage . "\n\n";
+        
+        foreach ($fields as $index => $field) {
+            $message .= ($index + 1) . ". " . ($field['label'] ?? 'Field ' . ($index + 1));
+            
+            if ($field['required'] ?? false) {
+                $message .= ' *';
+            }
+            
+            if ($field['type'] === 'choice' && !empty($field['options'])) {
+                $options = explode("\n", $field['options']);
+                $message .= " (Choose: " . implode(', ', array_map('trim', $options)) . ")";
+            }
+            
+            $message .= "\n";
+        }
+        
+        $message .= "\n* Required fields\n";
+        $message .= "Please provide all information in your response.";
+
+        return $message;
     }
 }

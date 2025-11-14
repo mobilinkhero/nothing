@@ -53,6 +53,10 @@ import LocationMessageNode from "./nodes/LocationMessageNode.vue";
 import ContactMessageNode from "./nodes/ContactMessageNode.vue";
 import AIAssistantNode from "./nodes/AIAssistantNode.vue";
 import WebhookApiNode from "./nodes/WebhookApi.vue";
+// Phase 1 New Nodes
+import ConditionNode from "./nodes/ConditionNode.vue";
+import DelayNode from "./nodes/DelayNode.vue";
+import InputCollectionNode from "./nodes/InputCollectionNode.vue";
 // Custom edge
 import CustomEdge from "./ui/CustomEdge.vue";
 
@@ -68,6 +72,10 @@ const nodeTypes = markRaw({
     contactMessage: ContactMessageNode,
     aiAssistant: AIAssistantNode,
     webhookApi: WebhookApiNode,
+    // Phase 1 New Nodes
+    condition: ConditionNode,
+    delay: DelayNode,
+    inputCollection: InputCollectionNode,
 });
 
 // Custom edge types
