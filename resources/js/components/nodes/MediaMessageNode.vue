@@ -330,14 +330,22 @@ onMounted(() => {
 });
 // Get preview content based on media type and URL
 const mediaPreview = computed(() => {
-  // Show preview if URL exists OR if file is uploaded
-  const sourceUrl = mediaUrl.value || (uploadedFile.value ? URL.createObjectURL(uploadedFile.value) : null);
+  // Priority: 1. Server URL, 2. Local blob URL, 3. None
+  let sourceUrl = null;
+  
+  if (mediaUrl.value && mediaUrl.value.trim()) {
+    // Use server URL if available
+    sourceUrl = mediaUrl.value;
+  } else if (uploadedFile.value) {
+    // Use blob URL for local file preview
+    sourceUrl = URL.createObjectURL(uploadedFile.value);
+  }
   
   if (!sourceUrl) return null;
 
   switch (mediaType.value) {
     case 'image':
-      return `<img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded"/>`;
+      return `<img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" onload="this.style.display='block'; if(this.nextElementSibling) this.nextElementSibling.style.display='none';"/><div style="display:none;" class="text-sm text-gray-500">Image preview unavailable</div>`;
     case 'video':
       return `<video controls class="max-h-32 max-w-full rounded">
                 <source src="${sourceUrl}" type="video/mp4">
