@@ -241,9 +241,13 @@ async function uploadFileToServer(file) {
 
     // Update with the public URL received from Laravel
     if (data && data.url) {
+      console.log('Upload successful, received URL:', data.url);
       mediaUrl.value = data.url; // This will be a public URL, not a blob
+      // Clear the uploaded file since we now have a server URL
+      // uploadedFile.value = null; // Don't clear this yet for debugging
       updateNodeData();
     } else {
+      console.error('Invalid response from server:', data);
       throw new Error('Invalid response from server');
     }
   } catch (error) {
@@ -332,20 +336,42 @@ onMounted(() => {
 const mediaPreview = computed(() => {
   // Priority: 1. Server URL, 2. Local blob URL, 3. None
   let sourceUrl = null;
+  let debugInfo = '';
   
   if (mediaUrl.value && mediaUrl.value.trim()) {
     // Use server URL if available
     sourceUrl = mediaUrl.value;
+    debugInfo = `Using server URL: ${sourceUrl.substring(0, 50)}...`;
   } else if (uploadedFile.value) {
     // Use blob URL for local file preview
     sourceUrl = URL.createObjectURL(uploadedFile.value);
+    debugInfo = `Using blob URL: ${sourceUrl.substring(0, 50)}...`;
+  } else {
+    debugInfo = 'No URL or file available';
   }
   
-  if (!sourceUrl) return null;
+  console.log('Media preview debug:', {
+    mediaUrl: mediaUrl.value,
+    uploadedFile: uploadedFile.value ? uploadedFile.value.name : null,
+    sourceUrl: sourceUrl,
+    debugInfo: debugInfo
+  });
+  
+  if (!sourceUrl) {
+    return `<div class="text-sm text-gray-500">No media to preview<br><small>${debugInfo}</small></div>`;
+  }
 
   switch (mediaType.value) {
     case 'image':
-      return `<img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" onload="this.style.display='block'; if(this.nextElementSibling) this.nextElementSibling.style.display='none';"/><div style="display:none;" class="text-sm text-gray-500">Image preview unavailable</div>`;
+      return `<div>
+                <img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded" 
+                     onerror="console.error('Image failed to load:', '${sourceUrl}'); this.style.display='none'; this.nextElementSibling.style.display='block';" 
+                     onload="console.log('Image loaded successfully:', '${sourceUrl}'); this.style.display='block'; if(this.nextElementSibling && this.nextElementSibling.nextElementSibling) this.nextElementSibling.nextElementSibling.style.display='none';"/>
+                <div style="display:none;" class="text-sm text-red-500">
+                  Image preview failed<br><small>URL: ${sourceUrl.substring(0, 50)}...</small>
+                </div>
+                <div style="display:none;" class="text-xs text-gray-400 mt-1">${debugInfo}</div>
+              </div>`;
     case 'video':
       return `<video controls class="max-h-32 max-w-full rounded">
                 <source src="${sourceUrl}" type="video/mp4">
