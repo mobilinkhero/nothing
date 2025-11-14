@@ -60,51 +60,15 @@ class BotFlowController extends Controller
             // Store the file in the public disk
             $storedPath = $file->storeAs($path, $filename, 'public');
 
-            // Debug logging
-            \Log::info('BotFlow Upload Debug', [
-                'path' => $path,
-                'filename' => $filename,
-                'stored_path' => $storedPath,
-                'file_exists_after_store' => Storage::disk('public')->exists($storedPath ?? ''),
-                'storage_path' => Storage::disk('public')->path($storedPath ?? ''),
-                'disk_config' => config('filesystems.disks.public')
-            ]);
-
             // Verify the file was stored successfully
             if (! $storedPath) {
-                \Log::error('BotFlow Upload Failed - No stored path', [
-                    'original_filename' => $file->getClientOriginalName(),
-                    'path' => $path,
-                    'filename' => $filename
-                ]);
                 return response()->json([
-                    'message' => 'File upload failed - storage returned null',
-                ], 500);
-            }
-
-            // Double check file exists
-            if (! Storage::disk('public')->exists($storedPath)) {
-                \Log::error('BotFlow Upload Failed - File not found after storage', [
-                    'stored_path' => $storedPath,
-                    'storage_path' => Storage::disk('public')->path($storedPath)
-                ]);
-                return response()->json([
-                    'message' => 'File upload failed - file not accessible after storage',
+                    'message' => 'File upload failed',
                 ], 500);
             }
 
             // Generate the public URL for the file
             $url = Storage::disk('public')->url($storedPath);
-
-            // Log success to home directory  
-            $this->logToHomeDirectory('BotFlow Upload SUCCESS', [
-                'timestamp' => now()->format('Y-m-d H:i:s'),
-                'original_filename' => $file->getClientOriginalName(),
-                'stored_path' => $storedPath,
-                'generated_url' => $url,
-                'file_size' => $file->getSize(),
-                'media_type' => $request->type
-            ]);
 
             // Return the URL to the frontend
             return response()->json([
