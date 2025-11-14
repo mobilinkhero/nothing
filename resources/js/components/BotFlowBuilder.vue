@@ -35,7 +35,6 @@ import {
   CaLocationPerson,
   MdOutlinedPermMedia,
   CdChecklist,
-  BsChatRightQuote,
   AkArrowLeft,
   AkArrowRight,
   AkLinkOn,
@@ -62,7 +61,6 @@ import ConditionNode from "./nodes/ConditionNode.vue";
 import DelayNode from "./nodes/DelayNode.vue";
 import InputCollectionNode from "./nodes/InputCollectionNode.vue";
 // Phase 2 New Nodes
-import QuickRepliesNode from "./nodes/QuickRepliesNode.vue";
 import TagManagementNode from "./nodes/TagManagementNode.vue";
 import VariableManagementNode from "./nodes/VariableManagementNode.vue";
 // Custom edge
@@ -84,7 +82,6 @@ const nodeTypes = markRaw({
     condition: ConditionNode,
     delay: DelayNode,
     inputCollection: InputCollectionNode,
-    quickReplies: QuickRepliesNode,
     tagManagement: TagManagementNode,
     variableManagement: VariableManagementNode,
 });
@@ -242,12 +239,6 @@ const nodeTemplates = reactive([
         label: "Input Collection",
         icon: HiDocumentText,
     },
-    // Phase 2 New Nodes
-    {
-        type: "quickReplies",
-        label: "Quick Replies",
-        icon: BsChatRightQuote,
-    },
     {
         type: "tagManagement",
         label: "Tag Management",
@@ -272,7 +263,6 @@ const nodeCategories = computed(() => {
         ],
         "Flow Control": ["condition", "delay", "inputCollection"],
         "Data & Variables": ["variableManagement", "tagManagement"],
-        "User Interaction": ["quickReplies"],
         "Advanced Features": aiAssistantEnabled.value
             ? ["aiAssistant", "webhookApi"]
             : ["webhookApi"],
@@ -405,20 +395,6 @@ function addNodeAtPosition(type, position) {
                 isValid: true
             };
             break;
-        case "quickReplies":
-            nodeData = {
-                message: '',
-                header: '',
-                footer: '',
-                replies: [
-                    { text: '', id: 'reply-0' },
-                    { text: '', id: 'reply-1' },
-                    { text: '', id: 'reply-2' }
-                ],
-                trackAnalytics: true,
-                isValid: true
-            };
-            break;
         case "tagManagement":
             nodeData = {
                 action: 'add',
@@ -533,7 +509,6 @@ const validateWorkflow = () => {
             (node.type === "condition" && node.data.isValid === false) ||
             (node.type === "delay" && node.data.isValid === false) ||
             (node.type === "inputCollection" && node.data.isValid === false) ||
-            (node.type === "quickReplies" && node.data.isValid === false) ||
             (node.type === "tagManagement" && node.data.isValid === false) ||
             (node.type === "variableManagement" && node.data.isValid === false)
         );
@@ -1131,18 +1106,6 @@ function getReplyTypeText(type) {
                             />
                         </template>
 
-                        <template #node-quickReplies="nodeProps">
-                            <QuickRepliesNode
-                                v-bind="nodeProps"
-                                @update:isValid="
-                                    handleTextNodeValidation(
-                                        nodeProps.id,
-                                        $event
-                                    )
-                                "
-                                @update-node="updateNodeData"
-                            />
-                        </template>
 
                         <template #node-tagManagement="nodeProps">
                             <TagManagementNode
