@@ -198,7 +198,7 @@ onConnect((params) => {
 
 // Node templates for adding new nodes
 const nodeTemplates = reactive([
-    { type: "textMessage", label: "Text Message", icon: BsChatRightQuote },
+    { type: "textMessage", label: "Text Message", icon: HiDocumentText },
     { type: "buttonMessage", label: "Button Message", icon: BsMenuButtonFill },
     { type: "callToAction", label: "Call To Action", icon: AkLinkOn },
     { type: "listMessage", label: "List Message", icon: CdChecklist },
