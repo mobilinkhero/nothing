@@ -35,6 +35,7 @@ import {
   CaLocationPerson,
   MdOutlinedPermMedia,
   CdChecklist,
+  BsChatRightQuote,
   AkArrowLeft,
   AkArrowRight,
   AkLinkOn,
@@ -61,6 +62,7 @@ import ConditionNode from "./nodes/ConditionNode.vue";
 import DelayNode from "./nodes/DelayNode.vue";
 import InputCollectionNode from "./nodes/InputCollectionNode.vue";
 // Phase 2 New Nodes
+import QuickRepliesNode from "./nodes/QuickRepliesNode.vue";
 import TagManagementNode from "./nodes/TagManagementNode.vue";
 import VariableManagementNode from "./nodes/VariableManagementNode.vue";
 // Custom edge
@@ -82,6 +84,7 @@ const nodeTypes = markRaw({
     condition: ConditionNode,
     delay: DelayNode,
     inputCollection: InputCollectionNode,
+    quickReplies: QuickRepliesNode,
     tagManagement: TagManagementNode,
     variableManagement: VariableManagementNode,
 });
@@ -198,7 +201,7 @@ onConnect((params) => {
 
 // Node templates for adding new nodes
 const nodeTemplates = reactive([
-    { type: "textMessage", label: "Text Message", icon: HiDocumentText },
+    { type: "textMessage", label: "Text Message", icon: BsChatRightQuote },
     { type: "buttonMessage", label: "Button Message", icon: BsMenuButtonFill },
     { type: "callToAction", label: "Call To Action", icon: AkLinkOn },
     { type: "listMessage", label: "List Message", icon: CdChecklist },
@@ -239,6 +242,12 @@ const nodeTemplates = reactive([
         label: "Input Collection",
         icon: HiDocumentText,
     },
+    // Phase 2 New Nodes
+    {
+        type: "quickReplies",
+        label: "Quick Replies",
+        icon: BsChatRightQuote,
+    },
     {
         type: "tagManagement",
         label: "Tag Management",
@@ -263,6 +272,7 @@ const nodeCategories = computed(() => {
         ],
         "Flow Control": ["condition", "delay", "inputCollection"],
         "Data & Variables": ["variableManagement", "tagManagement"],
+        "User Interaction": ["quickReplies"],
         "Advanced Features": aiAssistantEnabled.value
             ? ["aiAssistant", "webhookApi"]
             : ["webhookApi"],
@@ -395,6 +405,20 @@ function addNodeAtPosition(type, position) {
                 isValid: true
             };
             break;
+        case "quickReplies":
+            nodeData = {
+                message: '',
+                header: '',
+                footer: '',
+                replies: [
+                    { text: '', id: 'reply-0' },
+                    { text: '', id: 'reply-1' },
+                    { text: '', id: 'reply-2' }
+                ],
+                trackAnalytics: true,
+                isValid: true
+            };
+            break;
         case "tagManagement":
             nodeData = {
                 action: 'add',
@@ -509,6 +533,7 @@ const validateWorkflow = () => {
             (node.type === "condition" && node.data.isValid === false) ||
             (node.type === "delay" && node.data.isValid === false) ||
             (node.type === "inputCollection" && node.data.isValid === false) ||
+            (node.type === "quickReplies" && node.data.isValid === false) ||
             (node.type === "tagManagement" && node.data.isValid === false) ||
             (node.type === "variableManagement" && node.data.isValid === false)
         );
@@ -603,47 +628,14 @@ function showNotification(message, type = "info") {
         })
     );
 }
-
-// Handle node validation updates
 function handleTextNodeValidation(nodeId, isValid) {
-    console.log('Flow Builder: Validation update', { nodeId, isValid });
-    
     // Find the node in our nodes array
     const node = initialNodes.value.find((n) => n.id === nodeId);
     if (node) {
-        // Update the node's validation status
+        // Update the node data with the validation state
         node.data.isValid = isValid;
-        console.log('Flow Builder: Node validation updated', {
-            nodeId,
-            isValid,
-            nodeData: node.data
-        });
-    }
-    // After updating validation, validate the entire workflow
-    isFlowValid.value = validateWorkflow();
-}
-
-// Handle node data updates
-function updateNodeData(nodeUpdate) {
-    console.log('Flow Builder: Updating node data', nodeUpdate);
-    
-    // Find the node in our nodes array
-    const node = initialNodes.value.find((n) => n.id === nodeUpdate.id);
-    if (node) {
-        // Update the node's data
-        Object.assign(node.data, nodeUpdate.data);
-        console.log('Flow Builder: Node data updated', {
-            nodeId: nodeUpdate.id,
-            newData: node.data
-        });
-        
-        // Trigger reactivity
-        initialNodes.value = [...initialNodes.value];
-        
-        // Validate workflow after data update
-        isFlowValid.value = validateWorkflow();
-    } else {
-        console.warn('Flow Builder: Node not found for update', nodeUpdate.id);
+        // Update the overall flow validation
+        updateFlowValidity();
     }
 }
 
@@ -1103,33 +1095,6 @@ function getReplyTypeText(type) {
                                         $event
                                     )
                                 "
-                            />
-                        </template>
-
-
-                        <template #node-tagManagement="nodeProps">
-                            <TagManagementNode
-                                v-bind="nodeProps"
-                                @update:isValid="
-                                    handleTextNodeValidation(
-                                        nodeProps.id,
-                                        $event
-                                    )
-                                "
-                                @update-node="updateNodeData"
-                            />
-                        </template>
-
-                        <template #node-variableManagement="nodeProps">
-                            <VariableManagementNode
-                                v-bind="nodeProps"
-                                @update:isValid="
-                                    handleTextNodeValidation(
-                                        nodeProps.id,
-                                        $event
-                                    )
-                                "
-                                @update-node="updateNodeData"
                             />
                         </template>
 

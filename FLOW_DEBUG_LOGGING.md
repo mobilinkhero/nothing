@@ -1,25 +1,10 @@
 # Flow Builder Debug Logging
 
 ## 📋 Overview
-The Flow Builder now includes comprehensive debug logging to help troubleshoot issues during flow execution on both **local** and **live servers**.
+The Flow Builder now includes comprehensive debug logging to help troubleshoot issues during flow execution.
 
-## 📍 Log File Locations
-
-### **Primary Location** (Main Directory)
-```
-flow_debug.log
-```
-Located in your application's root directory (same level as `app/`, `public/`, `storage/`)
-
-**Local Server**: `c:\wamp64\www\flow_debug.log`
-**Live Server**: `/home/username/public_html/flow_debug.log` (or your server's root path)
-
-### **Fallback Location** (if main directory not writable)
-```
-storage/logs/flow_debug.log
-```
-
-The system automatically detects if the main directory is writable and falls back to `storage/logs/` if needed.
+## 📍 Log File Location
+**Main Directory**: `flow_debug.log` (in the root folder: `c:\wamp64\www\flow_debug.log`)
 
 ## 🔍 What Gets Logged
 
@@ -60,65 +45,31 @@ The system automatically detects if the main directory is writable and falls bac
 ```
 
 ### 2. Check the Log File
-
-#### **On Local Server (Windows)**
-```powershell
-# View latest entries
-Get-Content c:\wamp64\www\flow_debug.log -Tail 50
-
-# View all
-Get-Content c:\wamp64\www\flow_debug.log
-
-# Monitor in real-time
-Get-Content c:\wamp64\www\flow_debug.log -Wait -Tail 20
-```
-
-#### **On Live Server (Linux/SSH)**
 ```bash
-# Navigate to main directory
-cd /home/username/public_html
+# Location
+c:\wamp64\www\flow_debug.log
 
-# View latest entries
-tail -n 50 flow_debug.log
+# View latest entries (Windows PowerShell)
+Get-Content flow_debug.log -Tail 50
 
 # View all
-cat flow_debug.log
-
-# Monitor in real-time
-tail -f flow_debug.log
-
-# Search for errors
-grep -i "error\|exception" flow_debug.log
-
-# View with line numbers
-nl flow_debug.log | tail -50
+Get-Content flow_debug.log
 ```
-
-#### **Via FTP/File Manager**
-1. Connect to your server via FTP or cPanel File Manager
-2. Navigate to the main directory (root of your application)
-3. Download `flow_debug.log` file
-4. Open with a text editor
 
 ### 3. Read the Log Format
 ```
-=== [LIVE SERVER] 2025-11-14 21:55:30 ===
-MESSAGE: Quick Replies: Starting
-DATA: {
-    "to": "+1234567890",
-    "nodeData": {
-        "message": "Choose an option",
-        "replies": [...]
-    },
-    "phoneNumberId": "123456789"
-}
-MEMORY: 25.50 MB
-LOG FILE: /home/username/public_html/flow_debug.log
-====================================================================================================
-
+2025-11-14 21:55:30 | Quick Replies: Starting
+    Data: {
+        "to": "+1234567890",
+        "nodeData": {
+            "message": "Choose an option",
+            "replies": [...]
+        },
+        "phoneNumberId": "123456789"
+    }
+    Memory: 25.50 MB
+--------------------------------------------------------------------------------
 ```
-
-**Note**: Local server logs show `[LOCAL]` instead of `[LIVE SERVER]`
 
 ## 🔧 Troubleshooting Guide
 
@@ -144,38 +95,19 @@ LOG FILE: /home/username/public_html/flow_debug.log
 ## 🧹 Log Maintenance
 
 ### Clear Old Logs
-
-#### **On Local Server (Windows)**
-```powershell
+```bash
 # Delete the log file
-Remove-Item c:\wamp64\www\flow_debug.log
+Remove-Item flow_debug.log
 
 # Or clear content
-Clear-Content c:\wamp64\www\flow_debug.log
+Clear-Content flow_debug.log
 ```
 
-#### **On Live Server (Linux/SSH)**
+### Monitor in Real-Time
 ```bash
-# Navigate to main directory
-cd /home/username/public_html
-
-# Delete the log file
-rm flow_debug.log
-
-# Or clear content (keep file)
-> flow_debug.log
-# or
-echo "" > flow_debug.log
-
-# Keep only last 100 lines (useful for large logs)
-tail -n 100 flow_debug.log > flow_debug_temp.log && mv flow_debug_temp.log flow_debug.log
+# Windows PowerShell
+Get-Content flow_debug.log -Wait -Tail 20
 ```
-
-#### **Via FTP/File Manager**
-1. Connect to your server
-2. Navigate to main directory
-3. Delete or download `flow_debug.log`
-4. (Optional) Create a new empty file with the same name
 
 ## 🚨 Critical Errors
 
@@ -212,59 +144,39 @@ The `flow_debug.log` file may contain sensitive information:
 ## 📝 Example Debug Session
 
 ```
-=== [LIVE SERVER] 2025-11-14 21:55:30 ===
-MESSAGE: Flow Execution Started
-DATA: {
-    "node_type": "quickReplies",
-    "to": "+1234567890",
-    "phone_number_id": "123456789",
-    "contact_id": "456",
-    "node_data_keys": ["message", "replies", "trackAnalytics"]
-}
-MEMORY: 25.30 MB
-LOG FILE: /home/username/public_html/flow_debug.log
-====================================================================================================
-
-=== [LIVE SERVER] 2025-11-14 21:55:30 ===
-MESSAGE: Quick Replies: Starting
-DATA: {
-    "to": "+1234567890",
-    "nodeData": { ... },
-    "phoneNumberId": "123456789"
-}
-MEMORY: 25.35 MB
-LOG FILE: /home/username/public_html/flow_debug.log
-====================================================================================================
-
-=== [LIVE SERVER] 2025-11-14 21:55:30 ===
-MESSAGE: Quick Replies: Payload built
-DATA: {
-    "payload": {
-        "messaging_product": "whatsapp",
-        "type": "interactive",
-        "interactive": { ... }
-    },
-    "buttons_count": 3
-}
-MEMORY: 25.40 MB
-LOG FILE: /home/username/public_html/flow_debug.log
-====================================================================================================
-
-=== [LIVE SERVER] 2025-11-14 21:55:31 ===
-MESSAGE: Quick Replies: API Response
-DATA: {
-    "result": {
-        "status": true,
-        "responseCode": 200
-    },
-    "success": true,
-    "response_code": 200,
-    "response_body": "{\"messages\":[{\"id\":\"wamid.xxx\"}]}"
-}
-MEMORY: 25.50 MB
-LOG FILE: /home/username/public_html/flow_debug.log
-====================================================================================================
-
+2025-11-14 21:55:30 | Flow Execution Started
+    Data: {
+        "node_type": "quickReplies",
+        "to": "+1234567890",
+        "phone_number_id": "123456789",
+        "contact_id": "456",
+        "node_data_keys": ["message", "replies", "trackAnalytics"]
+    }
+    Memory: 25.30 MB
+--------------------------------------------------------------------------------
+2025-11-14 21:55:30 | Quick Replies: Starting
+    Data: { ... }
+    Memory: 25.35 MB
+--------------------------------------------------------------------------------
+2025-11-14 21:55:30 | Quick Replies: Payload built
+    Data: {
+        "payload": { ... },
+        "buttons_count": 3
+    }
+    Memory: 25.40 MB
+--------------------------------------------------------------------------------
+2025-11-14 21:55:31 | Quick Replies: API Response
+    Data: {
+        "result": {
+            "status": true,
+            "responseCode": 200
+        },
+        "success": true,
+        "response_code": 200,
+        "response_body": "{\"messages\":[{\"id\":\"wamid.xxx\"}]}"
+    }
+    Memory: 25.50 MB
+--------------------------------------------------------------------------------
 ```
 
 ---

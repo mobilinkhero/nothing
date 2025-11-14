@@ -1425,6 +1425,8 @@ trait WhatsApp
             case 'inputCollection':
                 return $this->processFlowInputCollection($to, $nodeData, $phoneNumberId, $contactData, $context);
 
+            case 'quickReplies':
+                return $this->sendFlowQuickReplies($to, $nodeData, $phoneNumberId, $contactData, $context);
 
             case 'tagManagement':
                 return $this->processFlowTagManagement($nodeData, $phoneNumberId, $contactData, $context);
@@ -3754,6 +3756,138 @@ trait WhatsApp
         return $message;
     }
 
+    /**
+     * Send quick replies message from flow (Phase 2)
+     */
+    protected function sendFlowQuickReplies($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $this->logFlowDebug('Quick Replies: Starting', [
+                'to' => $to,
+                'nodeData' => $nodeData,
+                'phoneNumberId' => $phoneNumberId
+            ]);
+
+            $message = $this->replaceFlowVariables($nodeData['message'] ?? '', $contactData);
+            $header = $this->replaceFlowVariables($nodeData['header'] ?? '', $contactData);
+            $footer = $this->replaceFlowVariables($nodeData['footer'] ?? '', $contactData);
+            $replies = $nodeData['replies'] ?? [];
+
+            // Filter out empty replies
+            $validReplies = array_filter($replies, function($reply) {
+                return !empty($reply['text']);
+            });
+
+            if (empty($validReplies)) {
+                $this->logFlowDebug('Quick Replies: No valid replies', ['replies' => $replies]);
+                return ['status' => false, 'message' => 'No valid quick replies configured'];
+            }
+
+            // Build WhatsApp quick reply buttons (interactive message)
+            $buttons = [];
+            foreach (array_values($validReplies) as $index => $reply) {
+                if ($index >= 13) break; // WhatsApp limit
+                
+                $buttons[] = [
+                    'type' => 'reply',
+                    'reply' => [
+                        'id' => $reply['id'] ?? "reply-{$index}",
+                        'title' => substr($reply['text'], 0, 20) // WhatsApp limit 20 chars
+                    ]
+                ];
+            }
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $to,
+                'type' => 'interactive',
+                'interactive' => [
+                    'type' => 'button',
+                    'body' => [
+                        'text' => $message
+                    ],
+                    'action' => [
+                        'buttons' => $buttons
+                    ]
+                ]
+            ];
+
+            // Add optional header
+            if (!empty($header)) {
+                $payload['interactive']['header'] = [
+                    'type' => 'text',
+                    'text' => $header
+                ];
+            }
+
+            // Add optional footer
+            if (!empty($footer)) {
+                $payload['interactive']['footer'] = [
+                    'text' => $footer
+                ];
+            }
+
+            $this->logFlowDebug('Quick Replies: Payload built', [
+                'payload' => $payload,
+                'buttons_count' => count($buttons)
+            ]);
+
+            // Track analytics if enabled
+            if ($nodeData['trackAnalytics'] ?? true) {
+                whatsapp_log('Quick replies sent', 'info', [
+                    'to' => $to,
+                    'replies_count' => count($buttons),
+                    'message' => substr($message, 0, 50)
+                ]);
+            }
+
+            // Load WhatsApp Cloud API config
+            $whatsapp_cloud_api = $this->loadConfig($phoneNumberId);
+            
+            $this->logFlowDebug('Quick Replies: Sending via API', [
+                'api_loaded' => !empty($whatsapp_cloud_api),
+                'to' => $to
+            ]);
+
+            // Send using WhatsApp Cloud API sendRequest method
+            $response = $whatsapp_cloud_api->sendRequest(
+                'POST',
+                '/' . $phoneNumberId . '/messages',
+                $payload
+            );
+            
+            $result = [
+                'status' => $response->httpStatusCode() >= 200 && $response->httpStatusCode() < 300,
+                'data' => json_decode($response->body()),
+                'responseCode' => $response->httpStatusCode(),
+                'message' => $response->httpStatusCode() >= 200 && $response->httpStatusCode() < 300 
+                    ? 'Quick replies sent successfully' 
+                    : 'Failed to send quick replies'
+            ];
+            
+            $this->logFlowDebug('Quick Replies: API Response', [
+                'result' => $result,
+                'success' => $result['status'],
+                'response_code' => $response->httpStatusCode(),
+                'response_body' => $response->body()
+            ]);
+
+            return $result;
+
+        } catch (\Exception $e) {
+            $this->logFlowDebug('Quick Replies: EXCEPTION', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'nodeData' => $nodeData
+            ]);
+
+            return [
+                'status' => false,
+                'message' => 'Quick Replies Error: ' . $e->getMessage()
+            ];
+        }
+    }
 
     /**
      * Process tag management from flow (Phase 2)
@@ -3991,57 +4125,31 @@ trait WhatsApp
     private function logFlowDebug($message, $data = [])
     {
         try {
-            // Use absolute path - works on both local and live server
-            // This will be in the main directory (same level as app/, public/, etc.)
             $logFile = base_path('flow_debug.log');
-            
-            // Ensure the directory is writable
-            $directory = dirname($logFile);
-            if (!is_writable($directory)) {
-                // Fall back to storage/logs if main directory not writable
-                $logFile = storage_path('logs/flow_debug.log');
-            }
-            
             $timestamp = date('Y-m-d H:i:s');
-            $serverInfo = php_sapi_name();
-            $isLive = !app()->environment('local');
             
             $logEntry = [
                 'timestamp' => $timestamp,
-                'server' => $isLive ? 'LIVE' : 'LOCAL',
-                'sapi' => $serverInfo,
                 'message' => $message,
                 'data' => $data,
                 'memory' => round(memory_get_usage() / 1024 / 1024, 2) . ' MB'
             ];
             
-            $logLine = '=== ' . ($isLive ? '[LIVE SERVER] ' : '[LOCAL] ') . $timestamp . ' ===' . PHP_EOL;
-            $logLine .= 'MESSAGE: ' . $message . PHP_EOL;
-            $logLine .= 'DATA: ' . json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-            $logLine .= 'MEMORY: ' . $logEntry['memory'] . PHP_EOL;
-            $logLine .= 'LOG FILE: ' . $logFile . PHP_EOL;
-            $logLine .= str_repeat('=', 100) . PHP_EOL . PHP_EOL;
+            $logLine = $timestamp . ' | ' . $message . PHP_EOL;
+            $logLine .= '    Data: ' . json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+            $logLine .= '    Memory: ' . $logEntry['memory'] . PHP_EOL;
+            $logLine .= str_repeat('-', 80) . PHP_EOL;
             
-            // Append to file
-            file_put_contents($logFile, $logLine, FILE_APPEND | LOCK_EX);
+            file_put_contents($logFile, $logLine, FILE_APPEND);
             
             // Also log to Laravel log for critical errors
             if (stripos($message, 'error') !== false || stripos($message, 'exception') !== false) {
-                \Log::error('[FLOW BUILDER] ' . $message, array_merge(['log_file' => $logFile], $data));
+                \Log::error($message, $data);
             }
             
         } catch (\Exception $e) {
-            // If logging fails, try to at least log to Laravel
-            try {
-                \Log::error('[FLOW BUILDER] Debug logging failed', [
-                    'error' => $e->getMessage(),
-                    'original_message' => $message,
-                    'trace' => $e->getTraceAsString()
-                ]);
-            } catch (\Exception $innerException) {
-                // Complete silence if even Laravel logging fails
-            }
+            // Silently fail if logging fails
+            \Log::error('Flow debug logging failed', ['error' => $e->getMessage()]);
         }
     }
-
 }
