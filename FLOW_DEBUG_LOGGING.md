@@ -144,19 +144,38 @@ LOG FILE: /home/username/public_html/flow_debug.log
 ## 🧹 Log Maintenance
 
 ### Clear Old Logs
-```bash
+
+#### **On Local Server (Windows)**
+```powershell
 # Delete the log file
-Remove-Item flow_debug.log
+Remove-Item c:\wamp64\www\flow_debug.log
 
 # Or clear content
-Clear-Content flow_debug.log
+Clear-Content c:\wamp64\www\flow_debug.log
 ```
 
-### Monitor in Real-Time
+#### **On Live Server (Linux/SSH)**
 ```bash
-# Windows PowerShell
-Get-Content flow_debug.log -Wait -Tail 20
+# Navigate to main directory
+cd /home/username/public_html
+
+# Delete the log file
+rm flow_debug.log
+
+# Or clear content (keep file)
+> flow_debug.log
+# or
+echo "" > flow_debug.log
+
+# Keep only last 100 lines (useful for large logs)
+tail -n 100 flow_debug.log > flow_debug_temp.log && mv flow_debug_temp.log flow_debug.log
 ```
+
+#### **Via FTP/File Manager**
+1. Connect to your server
+2. Navigate to main directory
+3. Delete or download `flow_debug.log`
+4. (Optional) Create a new empty file with the same name
 
 ## 🚨 Critical Errors
 

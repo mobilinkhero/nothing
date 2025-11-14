@@ -3773,6 +3773,12 @@ trait WhatsApp
             $footer = $this->replaceFlowVariables($nodeData['footer'] ?? '', $contactData);
             $replies = $nodeData['replies'] ?? [];
 
+            // Ensure message is not empty (WhatsApp requirement)
+            if (empty(trim($message))) {
+                $message = 'Please choose an option:'; // Default message
+                $this->logFlowDebug('Quick Replies: Empty message, using default', ['original_message' => $nodeData['message'] ?? '']);
+            }
+
             // Filter out empty replies
             $validReplies = array_filter($replies, function($reply) {
                 return !empty($reply['text']);
@@ -3847,30 +3853,54 @@ trait WhatsApp
             
             $this->logFlowDebug('Quick Replies: Sending via API', [
                 'api_loaded' => !empty($whatsapp_cloud_api),
-                'to' => $to
+                'to' => $to,
+                'message_length' => strlen($message),
+                'buttons_count' => count($buttons)
             ]);
 
             // Send using WhatsApp Cloud API sendRequest method
-            $response = $whatsapp_cloud_api->sendRequest(
-                'POST',
-                '/' . $phoneNumberId . '/messages',
-                $payload
-            );
+            try {
+                $response = $whatsapp_cloud_api->sendRequest(
+                    'POST',
+                    '/' . $phoneNumberId . '/messages',
+                    $payload
+                );
+                
+                $responseBody = $response->body();
+                $responseCode = $response->httpStatusCode();
+                
+                $this->logFlowDebug('Quick Replies: Raw API Response', [
+                    'response_code' => $responseCode,
+                    'response_body' => $responseBody,
+                    'response_length' => strlen($responseBody)
+                ]);
+                
+                $result = [
+                    'status' => $responseCode >= 200 && $responseCode < 300,
+                    'data' => json_decode($responseBody, true),
+                    'responseCode' => $responseCode,
+                    'message' => $responseCode >= 200 && $responseCode < 300 
+                        ? 'Quick replies sent successfully' 
+                        : 'Failed to send quick replies: HTTP ' . $responseCode
+                ];
+                
+            } catch (\Exception $apiException) {
+                $this->logFlowDebug('Quick Replies: API Exception', [
+                    'error' => $apiException->getMessage(),
+                    'trace' => $apiException->getTraceAsString()
+                ]);
+                
+                $result = [
+                    'status' => false,
+                    'responseCode' => 0,
+                    'message' => 'API Exception: ' . $apiException->getMessage(),
+                    'data' => null
+                ];
+            }
             
-            $result = [
-                'status' => $response->httpStatusCode() >= 200 && $response->httpStatusCode() < 300,
-                'data' => json_decode($response->body()),
-                'responseCode' => $response->httpStatusCode(),
-                'message' => $response->httpStatusCode() >= 200 && $response->httpStatusCode() < 300 
-                    ? 'Quick replies sent successfully' 
-                    : 'Failed to send quick replies'
-            ];
-            
-            $this->logFlowDebug('Quick Replies: API Response', [
+            $this->logFlowDebug('Quick Replies: Final Result', [
                 'result' => $result,
-                'success' => $result['status'],
-                'response_code' => $response->httpStatusCode(),
-                'response_body' => $response->body()
+                'success' => $result['status']
             ]);
 
             return $result;

@@ -19,8 +19,12 @@
               @input="updateNode"
               rows="3"
               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white resize-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your question or message..."
+              placeholder="Enter your question or message... (Required for WhatsApp)"
+              required
             ></textarea>
+            <p v-if="!nodeData.message.trim()" class="text-xs text-red-600 dark:text-red-400 mt-1">
+              ⚠️ Message text is required - WhatsApp doesn't allow empty messages
+            </p>
           </div>
 
           <!-- Header (Optional) -->
@@ -226,6 +230,14 @@ function updateNode() {
   const hasReplies = nodeData.replies.some(r => r.text.trim().length > 0)
   
   nodeData.isValid = hasMessage && hasReplies
+
+  // Show validation feedback
+  if (!hasMessage) {
+    console.warn('Quick Replies: Message text is required')
+  }
+  if (!hasReplies) {
+    console.warn('Quick Replies: At least one reply option is required')
+  }
 
   emit('update-node', {
     id: props.id,
