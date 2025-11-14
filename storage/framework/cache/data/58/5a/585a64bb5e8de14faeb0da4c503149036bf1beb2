@@ -1,0 +1,1 @@
+1763110291s:219:"O:27:"App\Settings\TenantSettings":5:{s:21:"isRegistrationEnabled";b:1;s:21:"isVerificationEnabled";b:0;s:26:"isEmailConfirmationEnabled";b:0;s:20:"isEnableWelcomeEmail";b:0;s:27:"set_default_tenant_language";s:2:"en";}";
