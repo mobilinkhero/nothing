@@ -8,7 +8,7 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['update:isValid']);
+const emit = defineEmits(['update:isValid', 'update-node']);
 
 const { removeNodes, nodes, addNodes } = useVueFlow();
 const node = useNode();
@@ -89,16 +89,28 @@ function handleCaptionInput() {
 }
 
 function updateNodeData() {
-  props.data.output = [
-    {
-      media_type: mediaType.value,
-      media_url: mediaUrl.value,
-      media_caption: caption.value,
-      media_filename: fileName.value,
-    },
-  ];
-  // Update validation state in the node data
-  props.data.isValid = isValid.value;
+  const nodeData = {
+    output: [
+      {
+        media_type: mediaType.value,
+        media_url: mediaUrl.value,
+        media_caption: caption.value,
+        media_filename: fileName.value,
+      },
+    ],
+    isValid: isValid.value
+  };
+  
+  // Update local props
+  props.data.output = nodeData.output;
+  props.data.isValid = nodeData.isValid;
+  
+  // Emit to parent BotFlowBuilder
+  emit('update-node', {
+    id: props.id,
+    data: nodeData
+  });
+  
   // Validate the form whenever data is updated
   validateForm();
 }
@@ -126,11 +138,10 @@ function handleClickDuplicate() {
 function validateForm() {
   errors.value = {};
 
-  // Check if media_url is empty
-  if (!mediaUrl.value.trim()) {
+  // Check if neither URL nor file is provided
+  if (!mediaUrl.value.trim() && !uploadedFile.value) {
     errors.value.mediaUrl = true;
   }
-
 
   // Update validation state
   const valid = isValid.value;
@@ -150,7 +161,8 @@ function toggleExpand() {
 
 // Computed property for overall validation state
 const isValid = computed(() => {
-  return mediaUrl.value.trim() !== '' ;
+  // Valid if either URL is provided OR file is uploaded
+  return mediaUrl.value.trim() !== '' || uploadedFile.value !== null;
 });
 
 async function handleFileUpload(event) {
@@ -200,6 +212,9 @@ async function uploadFileToServer(file) {
     formData.append('file', file);
     formData.append('type', mediaType.value);
 
+    // Get tenant subdomain from window or current URL
+    const tenantSubdomain = window.tenantSubdomain || window.location.pathname.split('/')[1] || '';
+    
     // Replace with your actual Laravel API endpoint
     const response = await fetch(`/${tenantSubdomain}/upload-media`, {
       method: 'POST',
@@ -315,19 +330,22 @@ onMounted(() => {
 });
 // Get preview content based on media type and URL
 const mediaPreview = computed(() => {
-  if (!mediaUrl.value) return null;
+  // Show preview if URL exists OR if file is uploaded
+  const sourceUrl = mediaUrl.value || (uploadedFile.value ? URL.createObjectURL(uploadedFile.value) : null);
+  
+  if (!sourceUrl) return null;
 
   switch (mediaType.value) {
     case 'image':
-      return `<img src="${mediaUrl.value}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded"/>`;
+      return `<img src="${sourceUrl}" alt="${fileName.value || 'Image preview'}" class="max-h-32 max-w-full rounded"/>`;
     case 'video':
       return `<video controls class="max-h-32 max-w-full rounded">
-                <source src="${mediaUrl.value}" type="video/mp4">
+                <source src="${sourceUrl}" type="video/mp4">
                 Your browser does not support the video tag.
               </video>`;
     case 'audio':
       return `<audio controls class="max-w-full">
-                <source src="${mediaUrl.value}" type="audio/mpeg">
+                <source src="${sourceUrl}" type="audio/mpeg">
                 Your browser does not support the audio tag.
               </audio>`;
     case 'document':
@@ -496,7 +514,7 @@ function getMediaTypeIcon(type) {
           <div>
             <div class="font-medium">Please fix the following errors:</div>
             <ul class="mt-1 list-inside list-disc">
-               <li v-if="errors.mediaUrl">Media URL is required</li>
+               <li v-if="errors.mediaUrl">Either upload a media file or provide a media URL</li>
             </ul>
           </div>
         </div>
@@ -608,7 +626,10 @@ function getMediaTypeIcon(type) {
                       />
                     </svg>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      {{ isUploading ? 'Uploading...' : fileName || 'Click to upload media' }}
+                      {{ isUploading ? 'Uploading...' : (uploadedFile ? `✓ ${fileName}` : 'Click to upload media') }}
+                    </p>
+                    <p v-if="uploadedFile && !isUploading" class="mt-1 text-xs text-green-600 dark:text-green-400">
+                      File ready for upload
                     </p>
                   </div>
                 </div>
@@ -645,8 +666,7 @@ function getMediaTypeIcon(type) {
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
               </svg>
-              Media URL
-               <span class="ml-1 text-danger-500">*</span>
+              Media URL (Optional if file uploaded)
             </label>
             <input
               v-model="mediaUrl"
@@ -735,7 +755,7 @@ function getMediaTypeIcon(type) {
 
           <!-- Media Preview -->
           <div
-            v-if="mediaUrl"
+            v-if="mediaUrl || uploadedFile"
             class="mt-4 rounded-md border border-gray-200 p-4 shadow-sm dark:border-gray-700"
           >
             <div class="mb-2 text-xs font-medium text-gray-700 dark:text-gray-300">Preview:</div>

@@ -1068,6 +1068,7 @@ function getReplyTypeText(type) {
                         <template #node-mediaMessage="nodeProps">
                             <MediaMessageNode
                                 v-bind="nodeProps"
+                                @update-node="handleNodeUpdate"
                                 @update:isValid="
                                     handleTextNodeValidation(
                                         nodeProps.id,
