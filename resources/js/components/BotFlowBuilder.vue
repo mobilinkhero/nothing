@@ -160,6 +160,7 @@ function handleNodeDragStop(event, node) {
 
 // Handle node connections
 onConnect((params) => {
+    console.log('Connection attempt:', params);
     addEdges({
         ...params,
         animated: true,
@@ -849,7 +850,9 @@ function getReplyTypeText(type) {
                         :min-zoom="0.2"
                         :max-zoom="4"
                         class="h-full"
-                        :connection-mode="ConnectionMode.Strict"
+                        :connection-mode="ConnectionMode.Loose"
+                        :connectable="true"
+                        :nodes-connectable="true"
                         @nodeDragStart="onNodeDragStart"
                         @nodeDragStop="handleNodeDragStop"
                         @drop="onDrop"

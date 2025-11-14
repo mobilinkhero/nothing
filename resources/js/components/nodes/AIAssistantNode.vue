@@ -132,13 +132,13 @@
         <Handle
           id="input"
           type="target"
-          :position="Position.Left"
+          position="left"
           class="w-3 h-3 !bg-gray-400"
         />
         <Handle
           id="output"
           type="source"
-          :position="Position.Right"
+          position="right"
           class="w-3 h-3 !bg-yellow-500"
         />
       </template>

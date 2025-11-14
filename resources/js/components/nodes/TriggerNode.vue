@@ -108,7 +108,7 @@
         <Handle
           id="output"
           type="source"
-          :position="Position.Right"
+          position="right"
           class="w-3 h-3 !bg-purple-500"
         />
       </template>

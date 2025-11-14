@@ -238,20 +238,20 @@
         <Handle
           id="input"
           type="target"
-          :position="Position.Left"
+          position="left"
           class="w-3 h-3 !bg-gray-400"
         />
         <Handle
           id="success"
           type="source"
-          :position="Position.Right"
+          position="right"
           :style="{ top: '30%' }"
           class="w-3 h-3 !bg-green-500"
         />
         <Handle
           id="error"
           type="source"
-          :position="Position.Right"
+          position="right"
           :style="{ top: '70%' }"
           class="w-3 h-3 !bg-red-500"
         />

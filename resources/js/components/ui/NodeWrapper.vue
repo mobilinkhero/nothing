@@ -130,6 +130,14 @@ const nodeStatus = computed(() => props.status)
   height: 12px;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: crosshair;
+  opacity: 1;
+  z-index: 10;
+}
+
+.node-wrapper :deep(.vue-flow__handle:hover) {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .node-wrapper :deep(.vue-flow__handle-left) {
@@ -146,5 +154,10 @@ const nodeStatus = computed(() => props.status)
 
 .node-wrapper :deep(.vue-flow__handle-bottom) {
   bottom: -6px;
+}
+
+.node-wrapper :deep(.vue-flow__handle-connecting) {
+  background: #3b82f6 !important;
+  transform: scale(1.3);
 }
 </style>
