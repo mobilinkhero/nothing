@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Stancl\Tenancy\Facades\Tenancy;
 
 class SalesBotController extends Controller
 {
@@ -30,7 +31,7 @@ class SalesBotController extends Controller
      */
     public function index()
     {
-        $salesBot = SalesBot::where('tenant_id', tenant('id'))->first();
+        $salesBot = SalesBot::where('tenant_id', Tenancy::getTenant()->id)->first();
         
         $stats = [];
         if ($salesBot) {
@@ -99,7 +100,7 @@ class SalesBotController extends Controller
             $tempBot = new SalesBot();
             
             $salesBot = SalesBot::create([
-                'tenant_id' => tenant('id'),
+                'tenant_id' => Tenancy::getTenant()->id,
                 'name' => $request->name,
                 'description' => $request->description,
                 'google_sheet_id' => $request->google_sheet_id,
@@ -150,7 +151,7 @@ class SalesBotController extends Controller
     public function show(SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             abort(403, 'Unauthorized access to Sales Bot');
         }
         
@@ -165,7 +166,7 @@ class SalesBotController extends Controller
     public function edit(SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             abort(403, 'Unauthorized access to Sales Bot');
         }
         
@@ -178,7 +179,7 @@ class SalesBotController extends Controller
     public function update(Request $request, SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             abort(403, 'Unauthorized access to Sales Bot');
         }
 
@@ -224,7 +225,7 @@ class SalesBotController extends Controller
     public function syncProducts(SalesBot $salesBot): JsonResponse
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
@@ -251,7 +252,7 @@ class SalesBotController extends Controller
     public function products(SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
@@ -273,7 +274,7 @@ class SalesBotController extends Controller
     public function orders(SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
@@ -296,7 +297,7 @@ class SalesBotController extends Controller
     public function updateOrderStatus(Request $request, SalesBot $salesBot, SalesBotOrder $order): JsonResponse
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
@@ -344,7 +345,7 @@ class SalesBotController extends Controller
     public function analytics(SalesBot $salesBot)
     {
         // Check tenant access
-        if ($salesBot->tenant_id !== tenant('id')) {
+        if ($salesBot->tenant_id !== Tenancy::getTenant()->id) {
             return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
         }
 
