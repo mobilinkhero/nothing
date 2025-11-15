@@ -49,10 +49,15 @@ class TestSalesBotSheets extends Command
             
             // Create Orders sheet if needed
             $this->info('4. Setting up Orders sheet...');
-            if ($this->googleSheetsService->createOrdersHeaders($spreadsheetId, 'Orders')) {
-                $this->info('✅ Orders sheet ready');
-            } else {
-                $this->error('❌ Failed to setup Orders sheet');
+            try {
+                if ($this->googleSheetsService->createOrdersHeaders($spreadsheetId, 'Orders')) {
+                    $this->info('✅ Orders sheet ready');
+                } else {
+                    $this->error('❌ Failed to setup Orders sheet');
+                    $this->warn('Check the Laravel logs for detailed error information');
+                }
+            } catch (\Exception $e) {
+                $this->error('❌ Exception creating Orders sheet: ' . $e->getMessage());
             }
             
             // Test order saving

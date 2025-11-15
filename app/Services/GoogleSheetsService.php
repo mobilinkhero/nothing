@@ -192,20 +192,34 @@ class GoogleSheetsService
     public function createOrdersHeaders(string $spreadsheetId, string $sheetName = 'Orders'): bool
     {
         try {
-            // Ensure sheet exists first
-            $this->ensureSheetExists($spreadsheetId, $sheetName);
+            Log::info("Starting createOrdersHeaders for sheet '{$sheetName}'");
             
-            // Check if headers already exist
+            // Check if headers already exist first
             if ($this->hasHeaders($spreadsheetId, $sheetName)) {
+                Log::info("Headers already exist for sheet '{$sheetName}'");
                 return true; // Headers already exist
             }
             
-            $headers = [
-                ['Order Number', 'Customer Name', 'Customer Phone', 'Total Amount', 'Currency', 'Status', 'Products', 'Created At', 'Delivery Address', 'Notes']
-            ];
-
-            $range = $sheetName . '!A1:J1';
-            return $this->writeSheet($spreadsheetId, $range, $headers);
+            // Try to ensure sheet exists using batch update
+            $sheetCreated = $this->ensureSheetExists($spreadsheetId, $sheetName);
+            
+            $headers = ['Order Number', 'Customer Name', 'Customer Phone', 'Total Amount', 'Currency', 'Status', 'Products', 'Created At', 'Delivery Address', 'Notes'];
+            
+            if ($sheetCreated) {
+                // Sheet exists, try to write headers normally
+                try {
+                    $headerValues = [$headers];
+                    $range = $sheetName . '!A1:J1';
+                    return $this->writeSheet($spreadsheetId, $range, $headerValues);
+                } catch (Exception $e) {
+                    Log::warning("Normal header write failed, trying alternative method: " . $e->getMessage());
+                }
+            }
+            
+            // Fallback: Try alternative method (create sheet by writing headers directly)
+            Log::info("Trying alternative sheet creation method for '{$sheetName}'");
+            return $this->createSheetByWritingHeaders($spreadsheetId, $sheetName, $headers);
+            
         } catch (Exception $e) {
             Log::error('Create orders headers error: ' . $e->getMessage());
             return false;
@@ -273,11 +287,28 @@ class GoogleSheetsService
             $existingSheets = $this->getSheetNames($spreadsheetId);
             
             if (in_array($sheetName, $existingSheets)) {
+                Log::info("Sheet '{$sheetName}' already exists");
                 return true; // Sheet already exists
             }
             
-            // Create the sheet
-            return $this->createSheet($spreadsheetId, $sheetName);
+            Log::info("Sheet '{$sheetName}' does not exist, attempting to create");
+            
+            // Try to create the sheet
+            $result = $this->createSheet($spreadsheetId, $sheetName);
+            
+            if ($result) {
+                // Verify creation by checking sheets again
+                $updatedSheets = $this->getSheetNames($spreadsheetId);
+                if (in_array($sheetName, $updatedSheets)) {
+                    Log::info("Sheet '{$sheetName}' successfully created and verified");
+                    return true;
+                } else {
+                    Log::error("Sheet '{$sheetName}' creation reported success but sheet not found in updated list");
+                    return false;
+                }
+            }
+            
+            return false;
             
         } catch (Exception $e) {
             Log::error('Ensure sheet exists error: ' . $e->getMessage());
@@ -291,11 +322,10 @@ class GoogleSheetsService
     public function createSheet(string $spreadsheetId, string $sheetName): bool
     {
         try {
+            Log::info("Attempting to create sheet '{$sheetName}' in spreadsheet {$spreadsheetId}");
+            
             $sheetProperties = new SheetProperties();
             $sheetProperties->setTitle($sheetName);
-            
-            $sheet = new Sheet();
-            $sheet->setProperties($sheetProperties);
             
             $addSheetRequest = new AddSheetRequest();
             $addSheetRequest->setProperties($sheetProperties);
@@ -303,16 +333,34 @@ class GoogleSheetsService
             $batchUpdateRequest = new BatchUpdateSpreadsheetRequest();
             $batchUpdateRequest->setRequests([$addSheetRequest]);
             
-            $this->sheetsService->spreadsheets->batchUpdate(
+            Log::info("Sending batch update request to Google Sheets API");
+            
+            $response = $this->sheetsService->spreadsheets->batchUpdate(
                 $spreadsheetId,
                 $batchUpdateRequest
             );
             
+            Log::info("Batch update completed successfully");
             Log::info("Created sheet '{$sheetName}' in spreadsheet {$spreadsheetId}");
+            
             return true;
             
+        } catch (\Google\Service\Exception $e) {
+            Log::error("Google Sheets API Error creating sheet '{$sheetName}': " . $e->getMessage());
+            Log::error("API Error details: " . json_encode([
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'errors' => $e->getErrors()
+            ]));
+            return false;
         } catch (Exception $e) {
-            Log::error("Failed to create sheet '{$sheetName}': " . $e->getMessage());
+            Log::error("General error creating sheet '{$sheetName}': " . $e->getMessage());
+            Log::error("Full error details: " . json_encode([
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]));
             return false;
         }
     }
@@ -329,6 +377,42 @@ class GoogleSheetsService
             return !empty($values) && !empty($values[0]);
         } catch (Exception $e) {
             Log::error('Check headers error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Alternative method to create sheet by writing headers directly
+     * Sometimes this works when batchUpdate fails
+     */
+    public function createSheetByWritingHeaders(string $spreadsheetId, string $sheetName, array $headers): bool
+    {
+        try {
+            Log::info("Attempting alternative sheet creation for '{$sheetName}' by writing headers directly");
+            
+            $range = $sheetName . '!A1:J1';
+            $values = [$headers];
+            
+            $body = new ValueRange([
+                'values' => $values
+            ]);
+
+            $params = [
+                'valueInputOption' => 'RAW'
+            ];
+
+            $this->sheetsService->spreadsheets_values->update(
+                $spreadsheetId,
+                $range,
+                $body,
+                $params
+            );
+
+            Log::info("Successfully created sheet '{$sheetName}' by writing headers");
+            return true;
+            
+        } catch (Exception $e) {
+            Log::error("Alternative sheet creation failed for '{$sheetName}': " . $e->getMessage());
             return false;
         }
     }
