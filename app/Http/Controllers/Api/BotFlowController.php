@@ -180,7 +180,7 @@ class BotFlowController extends Controller
             'trigger_conditions.business_hours' => 'boolean',
             'nodes' => 'required|array|min:1',
             'nodes.*.id' => 'required|string|max:100',
-            'nodes.*.type' => 'required|string|in:message,question,condition,action',
+            'nodes.*.type' => 'required|string|in:message,question,condition,action,salesBot',
             'nodes.*.content' => 'required|array',
             'settings.max_retries' => 'integer|min:1|max:10',
             'settings.timeout_minutes' => 'integer|min:1|max:1440',

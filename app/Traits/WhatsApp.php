@@ -1432,6 +1432,9 @@ trait WhatsApp
             case 'variableManagement':
                 return $this->processFlowVariableManagement($nodeData, $phoneNumberId, $contactData, $context);
 
+            case 'salesBot':
+                return $this->processFlowSalesBot($to, $nodeData, $phoneNumberId, $contactData, $context);
+
             default:
                 return ['status' => false, 'message' => 'Unsupported node type: '.$nodeType];
         }
@@ -4259,5 +4262,298 @@ trait WhatsApp
                 'message' => 'Failed to send typing indicator: ' . $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Process Sales Bot Flow Node
+     *
+     * @param string $to Recipient phone number
+     * @param array $nodeData Node configuration data
+     * @param string $phoneNumberId WhatsApp phone number ID
+     * @param object $contactData Contact information
+     * @param array $context Flow context information
+     * @return array Response data
+     */
+    protected function processFlowSalesBot($to, $nodeData, $phoneNumberId, $contactData, $context = [])
+    {
+        try {
+            $this->logFlowDebug('Sales Bot Processing Started', [
+                'mode' => $nodeData['mode'] ?? 'catalog',
+                'to' => $to,
+                'contact_id' => $contactData->id ?? 'N/A'
+            ]);
+
+            $mode = $nodeData['mode'] ?? 'catalog';
+            $productSheetUrl = $nodeData['productSheetUrl'] ?? '';
+            $ordersSheetUrl = $nodeData['ordersSheetUrl'] ?? '';
+
+            switch ($mode) {
+                case 'catalog':
+                    return $this->processSalesBotCatalog($to, $nodeData, $phoneNumberId, $contactData, $context);
+                
+                case 'order':
+                    return $this->processSalesBotOrder($to, $nodeData, $phoneNumberId, $contactData, $context);
+                
+                case 'reminder':
+                    return $this->processSalesBotReminder($to, $nodeData, $phoneNumberId, $contactData, $context);
+                
+                case 'upsell':
+                    return $this->processSalesBotUpsell($to, $nodeData, $phoneNumberId, $contactData, $context);
+                
+                default:
+                    return ['status' => false, 'message' => 'Invalid sales bot mode: ' . $mode];
+            }
+
+        } catch (\Exception $e) {
+            $this->logFlowDebug('Sales Bot Processing Error', [
+                'error' => $e->getMessage(),
+                'to' => $to,
+                'contact_id' => $contactData->id ?? 'N/A'
+            ]);
+
+            return [
+                'status' => false,
+                'message' => 'Sales bot processing failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Process Sales Bot Catalog Mode
+     */
+    protected function processSalesBotCatalog($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $productSheetUrl = $nodeData['productSheetUrl'] ?? '';
+            $selectedProducts = $nodeData['selectedProducts'] ?? [];
+
+            // Fetch products from Google Sheets
+            $products = $this->fetchProductsFromSheet($productSheetUrl, $selectedProducts);
+            
+            if (empty($products)) {
+                return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, 'Sorry, no products are available at the moment.');
+            }
+
+            // Create product catalog message
+            $catalogMessage = $this->createProductCatalogMessage($products);
+            
+            return $this->sendFlowListMessage($to, ['output' => [$catalogMessage]], $phoneNumberId, $contactData, $context);
+
+        } catch (\Exception $e) {
+            return ['status' => false, 'message' => 'Catalog processing failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Process Sales Bot Order Mode
+     */
+    protected function processSalesBotOrder($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $orderSettings = $nodeData['orderSettings'] ?? [];
+            $ordersSheetUrl = $nodeData['ordersSheetUrl'] ?? '';
+
+            // Parse order from user input
+            $orderData = $this->parseOrderFromContext($context, $contactData);
+            
+            if (empty($orderData)) {
+                return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, 'Please select products to order.');
+            }
+
+            // Save order to Google Sheets
+            $orderSaved = $this->saveOrderToSheet($ordersSheetUrl, $orderData, $contactData);
+            
+            if (!$orderSaved) {
+                return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, 'Sorry, there was an error processing your order. Please try again.');
+            }
+
+            // Schedule reminders if enabled
+            $this->scheduleOrderReminders($orderData, $contactData, $nodeData);
+
+            // Send confirmation message
+            $thankYouMessage = $orderSettings['thankYouMessage'] ?? 'Thank you for your order! We will contact you soon.';
+            
+            return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, $thankYouMessage);
+
+        } catch (\Exception $e) {
+            return ['status' => false, 'message' => 'Order processing failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Process Sales Bot Reminder Mode
+     */
+    protected function processSalesBotReminder($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $reminderSettings = $nodeData['reminderSettings'] ?? [];
+            
+            if (!($reminderSettings['enabled'] ?? true)) {
+                return ['status' => true, 'message' => 'Reminders disabled'];
+            }
+
+            $reminderMessage = $reminderSettings['reminderMessage'] ?? 'Hi! You have items in your cart. Complete your order now!';
+            
+            // Check if user has pending orders
+            $hasPendingOrders = $this->checkPendingOrders($contactData);
+            
+            if ($hasPendingOrders) {
+                return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, $reminderMessage);
+            }
+
+            return ['status' => true, 'message' => 'No pending orders to remind about'];
+
+        } catch (\Exception $e) {
+            return ['status' => false, 'message' => 'Reminder processing failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Process Sales Bot Upsell Mode
+     */
+    protected function processSalesBotUpsell($to, $nodeData, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $upsellSettings = $nodeData['upsellSettings'] ?? [];
+            
+            if (!($upsellSettings['enabled'] ?? true)) {
+                return ['status' => true, 'message' => 'Upselling disabled'];
+            }
+
+            $basedOn = $upsellSettings['basedOn'] ?? 'interactions';
+            $upsellMessage = $upsellSettings['upsellMessage'] ?? 'Based on your interests, you might like these products:';
+
+            // Get recommended products based on user behavior
+            $recommendedProducts = $this->getRecommendedProducts($contactData, $basedOn, $nodeData);
+            
+            if (empty($recommendedProducts)) {
+                return ['status' => true, 'message' => 'No recommendations available'];
+            }
+
+            // Create upsell catalog
+            $upsellCatalog = $this->createProductCatalogMessage($recommendedProducts, $upsellMessage);
+            
+            return $this->sendFlowListMessage($to, ['output' => [$upsellCatalog]], $phoneNumberId, $contactData, $context);
+
+        } catch (\Exception $e) {
+            return ['status' => false, 'message' => 'Upsell processing failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Helper Methods for Sales Bot
+     */
+    
+    protected function fetchProductsFromSheet($sheetUrl, $selectedProducts = [])
+    {
+        // Implement Google Sheets API integration
+        // This is a placeholder - you'll need to implement actual Google Sheets API calls
+        try {
+            // Mock data for now - replace with actual Google Sheets API implementation
+            $mockProducts = [
+                ['id' => '1', 'name' => 'Product 1', 'price' => '$19.99', 'description' => 'Great product 1'],
+                ['id' => '2', 'name' => 'Product 2', 'price' => '$29.99', 'description' => 'Amazing product 2'],
+                ['id' => '3', 'name' => 'Product 3', 'price' => '$39.99', 'description' => 'Fantastic product 3'],
+            ];
+            
+            if (!empty($selectedProducts)) {
+                return array_filter($mockProducts, function($product) use ($selectedProducts) {
+                    return in_array($product['id'], $selectedProducts);
+                });
+            }
+            
+            return $mockProducts;
+        } catch (\Exception $e) {
+            $this->logFlowDebug('Failed to fetch products from sheet', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    protected function createProductCatalogMessage($products, $headerText = 'Available Products')
+    {
+        $sections = [];
+        
+        foreach ($products as $product) {
+            $sections[] = [
+                'title' => 'Products',
+                'items' => [[
+                    'id' => $product['id'],
+                    'title' => $product['name'] . ' - ' . $product['price'],
+                    'description' => $product['description'] ?? ''
+                ]]
+            ];
+        }
+
+        return [
+            'reply_text' => $headerText,
+            'buttonText' => 'Select Product',
+            'sections' => $sections
+        ];
+    }
+
+    protected function saveOrderToSheet($sheetUrl, $orderData, $contactData)
+    {
+        // Implement Google Sheets API integration to save order
+        // This is a placeholder - you'll need to implement actual Google Sheets API calls
+        try {
+            $this->logFlowDebug('Order saved to sheet (mock)', [
+                'order_data' => $orderData,
+                'contact_id' => $contactData->id ?? 'N/A'
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            $this->logFlowDebug('Failed to save order to sheet', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    protected function parseOrderFromContext($context, $contactData)
+    {
+        // Parse order information from flow context
+        // This is a placeholder - implement based on your context structure
+        return [
+            'contact_id' => $contactData->id ?? null,
+            'products' => $context['selected_products'] ?? [],
+            'total' => $context['order_total'] ?? 0,
+            'timestamp' => now()
+        ];
+    }
+
+    protected function scheduleOrderReminders($orderData, $contactData, $nodeData)
+    {
+        // Schedule reminder jobs/tasks
+        // This is a placeholder - implement with your job queue system
+        $this->logFlowDebug('Order reminders scheduled (mock)', [
+            'order_id' => $orderData['id'] ?? 'unknown',
+            'contact_id' => $contactData->id ?? 'N/A'
+        ]);
+    }
+
+    protected function checkPendingOrders($contactData)
+    {
+        // Check if contact has pending orders
+        // This is a placeholder - implement with your order system
+        return false; // Mock response
+    }
+
+    protected function getRecommendedProducts($contactData, $basedOn, $nodeData)
+    {
+        // Get product recommendations based on user behavior
+        // This is a placeholder - implement with your recommendation engine
+        return $this->fetchProductsFromSheet($nodeData['productSheetUrl'] ?? '', ['2', '3']); // Mock recommendations
+    }
+
+    protected function sendSimpleTextMessage($to, $phoneNumberId, $contactData, $message)
+    {
+        $messageData = [
+            'rel_type' => $contactData->type ?? 'guest',
+            'rel_id' => $contactData->id ?? '',
+            'reply_text' => $message,
+            'bot_header' => '',
+            'bot_footer' => '',
+            'tenant_id' => $this->wa_tenant_id,
+        ];
+
+        return $this->sendMessage($to, $messageData, $phoneNumberId);
     }
 }

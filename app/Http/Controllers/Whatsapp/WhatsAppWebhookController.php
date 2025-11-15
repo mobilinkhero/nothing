@@ -2670,6 +2670,35 @@ class WhatsAppWebhookController extends Controller
 
                 return $contactHtml;
 
+            case 'salesBot':
+                $mode = $nodeData['mode'] ?? 'catalog';
+                $productSheetUrl = $nodeData['productSheetUrl'] ?? '';
+                $ordersSheetUrl = $nodeData['ordersSheetUrl'] ?? '';
+                
+                $salesBotHtml = "<div class='bg-purple-50 rounded-lg p-3 dark:bg-purple-800'>";
+                $salesBotHtml .= "<div class='flex items-center mb-2'>";
+                $salesBotHtml .= "<span class='text-lg mr-2'>🛒</span>";
+                $salesBotHtml .= "<div class='font-semibold text-purple-700 dark:text-purple-300'>Sales Bot - " . ucfirst($mode) . " Mode</div>";
+                $salesBotHtml .= "</div>";
+                
+                switch ($mode) {
+                    case 'catalog':
+                        $salesBotHtml .= "<div class='text-sm text-purple-600 dark:text-purple-400'>Displaying product catalog</div>";
+                        break;
+                    case 'order':
+                        $salesBotHtml .= "<div class='text-sm text-purple-600 dark:text-purple-400'>Processing customer orders</div>";
+                        break;
+                    case 'reminder':
+                        $salesBotHtml .= "<div class='text-sm text-purple-600 dark:text-purple-400'>Sending order reminders</div>";
+                        break;
+                    case 'upsell':
+                        $salesBotHtml .= "<div class='text-sm text-purple-600 dark:text-purple-400'>Recommending products</div>";
+                        break;
+                }
+                
+                $salesBotHtml .= "</div>";
+                return $salesBotHtml;
+
             default:
                 return '<p>Flow message: '.e($nodeType).'</p>';
         }
