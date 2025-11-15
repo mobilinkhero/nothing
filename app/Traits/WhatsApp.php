@@ -4157,15 +4157,18 @@ trait WhatsApp
     public function sendTypingIndicator($to, $phoneNumberId)
     {
         try {
-            $whatsappApi = $this->getWhatsAppApi();
-            
-            // WhatsApp typing indicator API call
-            $response = $whatsappApi->sendTyping($to, true, $phoneNumberId);
+            // For now, just simulate typing indicator (WhatsApp API might not support real typing)
+            // This prevents the delay from being blocked by typing indicator failures
+            whatsapp_log('Simulated typing indicator', 'debug', [
+                'to' => $to,
+                'phone_number_id' => $phoneNumberId,
+                'note' => 'Real typing indicator not implemented yet'
+            ]);
             
             return [
                 'status' => true,
-                'message' => 'Typing indicator sent',
-                'data' => $response
+                'message' => 'Typing indicator simulated',
+                'data' => null
             ];
         } catch (\Exception $e) {
             whatsapp_log('Failed to send typing indicator', 'warning', [

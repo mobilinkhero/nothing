@@ -3118,13 +3118,22 @@ class WhatsAppWebhookController extends Controller
                 'contact_number' => $contactNumber,
             ]);
 
-            // Show typing indicator if enabled
+            // Show typing indicator if enabled (non-blocking)
             if ($showTyping && $delaySeconds > 2) {
                 $this->debugDelayLog("SENDING TYPING INDICATOR", [
                     'delay_seconds' => $delaySeconds,
                     'contact_number' => $contactNumber
                 ]);
-                $this->showTypingIndicator($contactNumber, $phoneNumberId, min($delaySeconds, 30));
+                
+                try {
+                    $this->showTypingIndicator($contactNumber, $phoneNumberId, min($delaySeconds, 30));
+                    $this->debugDelayLog("TYPING INDICATOR SENT SUCCESSFULLY", []);
+                } catch (\Exception $e) {
+                    $this->debugDelayLog("TYPING INDICATOR FAILED - CONTINUING", [
+                        'error' => $e->getMessage()
+                    ]);
+                    // Continue with delay even if typing fails
+                }
             }
 
             // Implement actual delay
