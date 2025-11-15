@@ -39,35 +39,36 @@
         "spatie/laravel-permission": "^6.17",
         "stevebauman/purify": "^6.3",
         "stripe/stripe-php": "^17.2",
-        "theodo-group/llphant": "^0.9.9"
+        "theodo-group/llphant": "^0.9.9",
+        "google/apiclient": "^2.0"
     },
     "repositories": [
         {
             "type": "path",
             "url": "./platform/packages/corbital/laravel-settings",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         },
         {
             "type": "path",
             "url": "./platform/packages/corbital/module-manager",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         },
         {
             "type": "path",
             "url": "./platform/packages/corbital/laravel-emails",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         },
         {
             "type": "path",
             "url": "./platform/packages/corbital/installer",
             "options": {
-                "symlink": true
+                "symlink": false
             }
         }
     ],
