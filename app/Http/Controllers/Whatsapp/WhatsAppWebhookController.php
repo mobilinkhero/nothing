@@ -2288,7 +2288,7 @@ class WhatsAppWebhookController extends Controller
                     'node_data' => $nodeData,
                     'contact_number' => $contactNumber
                 ]);
-                return $this->processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context);
+                return $this->processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context, $triggerMsg, $chatId);
             }
             
             do_action('before_send_flow_message', ['contact_number' => $contactNumber, 'node_data' => $nodeData, 'node_type' => $nodeType, 'phone_number_id' => $phoneNumberId, 'contact_data' => $contactData, 'context' => $context, 'tenant_id' => $this->tenant_id, 'tenant_subdomain' => $this->tenant_subdoamin]);
@@ -3081,7 +3081,7 @@ class WhatsAppWebhookController extends Controller
     /**
      * Process delay node with actual delay implementation
      */
-    protected function processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context)
+    protected function processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context, $triggerMsg = '', $chatId = null)
     {
         try {
             $this->debugDelayLog("ENTERING processDelayNode", [
