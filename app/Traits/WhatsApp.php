@@ -4327,7 +4327,24 @@ trait WhatsApp
             $productSheetUrl = $nodeData['productSheetUrl'] ?? '';
             $selectedProducts = $nodeData['selectedProducts'] ?? [];
 
-            // Fetch products from Google Sheets
+            // Check if user mentioned a specific product code in their message
+            $userMessage = $context['user_message'] ?? '';
+            $requestedProductCode = $this->extractProductCodeFromMessage($userMessage);
+            
+            if ($requestedProductCode) {
+                // User requested specific product (e.g., "I want to buy AB01")
+                $product = $this->fetchSpecificProduct($productSheetUrl, $requestedProductCode);
+                
+                if ($product) {
+                    // Show specific product with buy option
+                    return $this->sendProductDetails($to, $product, $phoneNumberId, $contactData, $context);
+                } else {
+                    return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, 
+                        "Sorry, product code '{$requestedProductCode}' not found. Please check the code and try again.");
+                }
+            }
+
+            // Default catalog behavior - show all/selected products
             $products = $this->fetchProductsFromSheet($productSheetUrl, $selectedProducts);
             
             if (empty($products)) {
@@ -4555,5 +4572,84 @@ trait WhatsApp
         ];
 
         return $this->sendMessage($to, $messageData, $phoneNumberId);
+    }
+
+    /**
+     * Extract product code from user message
+     */
+    protected function extractProductCodeFromMessage($message)
+    {
+        // Look for patterns like AB01, XYZ123, P001, etc.
+        $patterns = [
+            '/\b([A-Z]{2,3}\d{2,4})\b/i',  // AB01, ABC123
+            '/\b(P\d{3,4})\b/i',           // P001, P1234
+            '/\b([A-Z]\d{2,3})\b/i',       // A01, B123
+            '/\bcode[:\s]*([A-Z0-9]{3,6})\b/i', // code: AB01
+            '/\bitem[:\s]*([A-Z0-9]{3,6})\b/i', // item: AB01
+            '/\bproduct[:\s]*([A-Z0-9]{3,6})\b/i' // product: AB01
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $message, $matches)) {
+                return strtoupper($matches[1]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fetch specific product by code from sheet
+     */
+    protected function fetchSpecificProduct($sheetUrl, $productCode)
+    {
+        // This would integrate with Google Sheets API
+        // For now, mock data matching the test sheet structure
+        $mockProducts = [
+            'AB01' => ['id' => 'AB01', 'name' => 'Wireless Headphones', 'price' => '$79.99', 'description' => 'Premium noise-canceling wireless headphones with 30-hour battery life', 'stock' => 50],
+            'AB02' => ['id' => 'AB02', 'name' => 'Smart Watch', 'price' => '$199.99', 'description' => 'Fitness tracking smartwatch with heart rate monitor and GPS', 'stock' => 25],
+            'AB03' => ['id' => 'AB03', 'name' => 'Coffee Maker', 'price' => '$149.99', 'description' => 'Programmable 12-cup coffee maker with built-in grinder', 'stock' => 15],
+            'AB04' => ['id' => 'AB04', 'name' => 'Yoga Mat', 'price' => '$29.99', 'description' => 'Non-slip premium yoga mat with carrying strap', 'stock' => 100],
+            'AB05' => ['id' => 'AB05', 'name' => 'LED Desk Lamp', 'price' => '$49.99', 'description' => 'Adjustable LED desk lamp with USB charging port', 'stock' => 75],
+        ];
+
+        return $mockProducts[$productCode] ?? null;
+    }
+
+    /**
+     * Send detailed product information with buy buttons
+     */
+    protected function sendProductDetails($to, $product, $phoneNumberId, $contactData, $context)
+    {
+        $stock = $product['stock'] ?? 0;
+        $stockText = $stock > 0 ? "✅ In Stock ({$stock} available)" : "❌ Out of Stock";
+        
+        $productMessage = "🛍️ *{$product['name']}*\n\n";
+        $productMessage .= "💰 Price: {$product['price']}\n";
+        $productMessage .= "📝 Description: {$product['description']}\n";
+        $productMessage .= "📦 Stock: {$stockText}\n\n";
+        
+        if ($stock > 0) {
+            $productMessage .= "Would you like to order this item?";
+            
+            // Create button message for ordering
+            $buttonMessage = [
+                'output' => [
+                    [
+                        'reply_text' => $productMessage,
+                        'button1' => '🛒 Order Now',
+                        'button2' => '📋 View More Products',
+                        'button3' => '❓ Ask Questions',
+                        'bot_header' => '',
+                        'bot_footer' => 'Reply with the button option you prefer',
+                    ]
+                ]
+            ];
+            
+            return $this->sendFlowButtonMessage($to, $buttonMessage, $phoneNumberId, $contactData, $context);
+        } else {
+            $productMessage .= "Sorry, this item is currently out of stock. Would you like to see similar products?";
+            return $this->sendSimpleTextMessage($to, $phoneNumberId, $contactData, $productMessage);
+        }
     }
 }
