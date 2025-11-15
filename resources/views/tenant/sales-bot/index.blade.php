@@ -112,6 +112,10 @@
                                     <x-heroicon-o-chart-bar class="w-5 h-5 mr-2" />
                                     Analytics
                                 </a>
+                                <button class="flex items-center justify-center px-4 py-3 bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/20 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800 rounded-lg transition duration-150 ease-in-out">
+                                    <x-heroicon-o-cog class="w-5 h-5 mr-2" />
+                                    Settings
+                                </button>
                             </div>
                         </div>
 
