@@ -13,7 +13,7 @@
                         Sales Bot Dashboard
                     </h4>
                     @if(!$salesBot)
-                        <a href="{{ route('tenant.sales-bot.create') }}" class="btn btn-primary">
+                        <a href="{{ tenant_route('tenant.sales-bot.create') }}" class="btn btn-primary">
                             <i class="fas fa-plus me-2"></i>Setup Sales Bot
                         </a>
                     @endif
@@ -26,7 +26,7 @@
                             <p class="lead text-muted mb-4">
                                 Set up your Sales Bot to automate product sales, order management, and customer follow-ups.
                             </p>
-                            <a href="{{ route('tenant.sales-bot.create') }}" class="btn btn-primary btn-lg">
+                            <a href="{{ tenant_route('tenant.sales-bot.create') }}" class="btn btn-primary btn-lg">
                                 <i class="fas fa-plus me-2"></i>Setup Sales Bot Now
                             </a>
                         </div>
@@ -103,19 +103,19 @@
                                                 </button>
                                             </div>
                                             <div class="col-md-6 col-lg-3 mb-3">
-                                                <a href="{{ route('tenant.sales-bot.products', $salesBot) }}" class="btn btn-outline-info w-100">
+                                                <a href="{{ tenant_route('tenant.sales-bot.products', $salesBot) }}" class="btn btn-outline-info w-100">
                                                     <i class="fas fa-box me-2"></i>
                                                     View Products
                                                 </a>
                                             </div>
                                             <div class="col-md-6 col-lg-3 mb-3">
-                                                <a href="{{ route('tenant.sales-bot.orders', $salesBot) }}" class="btn btn-outline-success w-100">
+                                                <a href="{{ tenant_route('tenant.sales-bot.orders', $salesBot) }}" class="btn btn-outline-success w-100">
                                                     <i class="fas fa-shopping-cart me-2"></i>
                                                     View Orders
                                                 </a>
                                             </div>
                                             <div class="col-md-6 col-lg-3 mb-3">
-                                                <a href="{{ route('tenant.sales-bot.analytics', $salesBot) }}" class="btn btn-outline-secondary w-100">
+                                                <a href="{{ tenant_route('tenant.sales-bot.analytics', $salesBot) }}" class="btn btn-outline-secondary w-100">
                                                     <i class="fas fa-chart-line me-2"></i>
                                                     Analytics
                                                 </a>
@@ -173,7 +173,7 @@
                                         <button class="btn btn-sm btn-outline-primary" onclick="testConnection()">
                                             <i class="fas fa-link me-1"></i>Test Connection
                                         </button>
-                                        <a href="{{ route('tenant.sales-bot.edit', $salesBot) }}" class="btn btn-sm btn-outline-secondary">
+                                        <a href="{{ tenant_route('tenant.sales-bot.edit', $salesBot) }}" class="btn btn-sm btn-outline-secondary">
                                             <i class="fas fa-cog me-1"></i>Settings
                                         </a>
                                     </div>
@@ -191,7 +191,7 @@
 <script>
 function syncProducts() {
     if (confirm('This will sync products from your Google Sheet. Continue?')) {
-        fetch('{{ route("tenant.sales-bot.sync-products", $salesBot) }}', {
+        fetch('{{ tenant_route("tenant.sales-bot.sync-products", $salesBot) }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -215,7 +215,7 @@ function syncProducts() {
 }
 
 function testConnection() {
-    fetch('{{ route("tenant.sales-bot.test-connection") }}', {
+    fetch('{{ tenant_route("tenant.sales-bot.test-connection") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

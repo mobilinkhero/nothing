@@ -184,7 +184,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <a href="{{ route('tenant.sales-bot.index') }}" class="btn btn-secondary">
+                            <a href="{{ tenant_route('tenant.sales-bot.index') }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Cancel
                             </a>
                             <button type="submit" class="btn btn-primary" id="submitBtn">
@@ -218,7 +218,7 @@ document.getElementById('salesBotForm').addEventListener('submit', function(e) {
     });
     data.reminder_settings = { intervals };
     
-    fetch('{{ route("tenant.sales-bot.store") }}', {
+    fetch('{{ tenant_route("tenant.sales-bot.store") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -230,7 +230,7 @@ document.getElementById('salesBotForm').addEventListener('submit', function(e) {
     .then(data => {
         if (data.success) {
             alert('Sales Bot created successfully!');
-            window.location.href = '{{ route("tenant.sales-bot.index") }}';
+            window.location.href = '{{ tenant_route("tenant.sales-bot.index") }}';
         } else {
             alert('Error: ' + data.message);
             if (data.errors) {
@@ -264,7 +264,7 @@ function testConnection() {
         return;
     }
     
-    fetch('{{ route("tenant.sales-bot.test-connection") }}', {
+    fetch('{{ tenant_route("tenant.sales-bot.test-connection") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
