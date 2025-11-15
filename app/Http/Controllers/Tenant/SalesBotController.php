@@ -217,6 +217,25 @@ class SalesBotController extends Controller
             // Handle both model objects and IDs (fallback for route binding issues)
             if (!$salesBot instanceof SalesBot) {
                 $currentTenant = Tenant::current();
+                if (!$currentTenant) {
+                    // Fallback: try to get tenant from request subdomain
+                    $subdomain = request()->route('subdomain');
+                    if ($subdomain) {
+                        $currentTenant = Tenant::where('subdomain', $subdomain)->first();
+                    }
+                }
+                
+                if (!$currentTenant) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No current tenant found',
+                        'debug_info' => [
+                            'subdomain' => request()->route('subdomain'),
+                            'suggestion' => 'Check tenant middleware and subdomain routing'
+                        ]
+                    ], 400);
+                }
+                
                 $salesBotId = $salesBot;
                 
                 $salesBot = SalesBot::where('id', $salesBotId)
