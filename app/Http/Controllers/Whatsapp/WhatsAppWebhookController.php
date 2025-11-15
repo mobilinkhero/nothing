@@ -1225,7 +1225,14 @@ class WhatsAppWebhookController extends Controller
      */
     private function processBotFlow(array $message_data)
     {
+        $this->debugDelayLog("FLOW EXECUTION STARTED", [
+            'message_data_keys' => array_keys($message_data),
+            'has_messages' => !empty($message_data['messages']),
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        
         if (empty($message_data['messages'])) {
+            $this->debugDelayLog("NO MESSAGES - EXITING", []);
             return;
         }
 
@@ -1235,6 +1242,13 @@ class WhatsAppWebhookController extends Controller
 
         // Use the new extraction method for both buttons and lists
         $button_id = $this->extractButtonIdFromMessage($message);
+        
+        $this->debugDelayLog("EXTRACTED MESSAGE DATA", [
+            'trigger_msg' => $trigger_msg,
+            'button_id' => $button_id,
+            'ref_message_id' => $ref_message_id,
+            'message_type' => $message['type'] ?? 'unknown'
+        ]);
 
         whatsapp_log('processBotFlow - Extracted data', 'info', [
             'trigger_msg' => $trigger_msg,
@@ -1945,6 +1959,18 @@ class WhatsAppWebhookController extends Controller
             try {
                 $nodeType = $node['type'];
 
+                // DEBUG: Log every single node in sequence
+                $this->debugDelayLog("PROCESSING NODE IN SEQUENCE", [
+                    'node_id' => $node['id'],
+                    'node_type' => $nodeType,
+                    'node_data' => $node['data'] ?? 'no_data',
+                    'position' => $node['position'],
+                    'index' => $index + 1,
+                    'total' => count($nodes),
+                    'is_delay_node' => ($nodeType === 'delay'),
+                    'timestamp' => date('Y-m-d H:i:s')
+                ]);
+
                 whatsapp_log('Processing node in sequence', 'debug', [
                     'node_id' => $node['id'],
                     'node_type' => $nodeType,
@@ -2246,8 +2272,22 @@ class WhatsAppWebhookController extends Controller
         ]);
 
         try {
+            // Debug all node processing
+            $this->debugDelayLog("Processing node", [
+                'node_id' => $node['id'],
+                'node_type' => $nodeType,
+                'contact_number' => $contactNumber,
+                'node_data' => $nodeData,
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+            
             // Special handling for delay nodes
             if ($nodeType === 'delay') {
+                $this->debugDelayLog("DELAY NODE DETECTED - Processing", [
+                    'node_id' => $node['id'],
+                    'node_data' => $nodeData,
+                    'contact_number' => $contactNumber
+                ]);
                 return $this->processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context);
             }
             
@@ -3044,11 +3084,31 @@ class WhatsAppWebhookController extends Controller
     protected function processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context)
     {
         try {
+            $this->debugDelayLog("ENTERING processDelayNode", [
+                'node_id' => $node['id'],
+                'raw_node_data' => $nodeData,
+                'contact_number' => $contactNumber,
+                'phone_number_id' => $phoneNumberId,
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+            
             $delayType = $nodeData['delayType'] ?? 'fixed';
             $showTyping = $nodeData['showTyping'] ?? true;
             
             // Calculate delay in seconds
             $delaySeconds = $this->calculateDelaySeconds($nodeData);
+            
+            $this->debugDelayLog("DELAY CALCULATION", [
+                'delay_type' => $delayType,
+                'delay_seconds' => $delaySeconds,
+                'show_typing' => $showTyping,
+                'calculation_input' => [
+                    'duration' => $nodeData['duration'] ?? 'not_set',
+                    'unit' => $nodeData['unit'] ?? 'not_set',
+                    'minDuration' => $nodeData['minDuration'] ?? 'not_set',
+                    'maxDuration' => $nodeData['maxDuration'] ?? 'not_set'
+                ]
+            ]);
             
             whatsapp_log('Processing delay node - starting', 'info', [
                 'node_id' => $node['id'],
@@ -3060,6 +3120,10 @@ class WhatsAppWebhookController extends Controller
 
             // Show typing indicator if enabled
             if ($showTyping && $delaySeconds > 2) {
+                $this->debugDelayLog("SENDING TYPING INDICATOR", [
+                    'delay_seconds' => $delaySeconds,
+                    'contact_number' => $contactNumber
+                ]);
                 $this->showTypingIndicator($contactNumber, $phoneNumberId, min($delaySeconds, 30));
             }
 
@@ -3067,13 +3131,29 @@ class WhatsAppWebhookController extends Controller
             if ($delaySeconds > 0) {
                 // Convert seconds to microseconds for usleep
                 $delayMicroseconds = min($delaySeconds * 1000000, 30000000); // Max 30 seconds to avoid timeouts
+                
+                $this->debugDelayLog("STARTING ACTUAL DELAY", [
+                    'delay_seconds' => $delaySeconds,
+                    'delay_microseconds' => $delayMicroseconds,
+                    'start_time' => microtime(true)
+                ]);
+                
                 whatsapp_log('Implementing delay', 'info', [
                     'node_id' => $node['id'],
                     'delay_seconds' => $delaySeconds,
                     'delay_microseconds' => $delayMicroseconds,
                 ]);
                 
+                $startTime = microtime(true);
                 usleep($delayMicroseconds);
+                $endTime = microtime(true);
+                $actualDelay = $endTime - $startTime;
+                
+                $this->debugDelayLog("DELAY COMPLETED", [
+                    'expected_seconds' => $delaySeconds,
+                    'actual_seconds' => $actualDelay,
+                    'end_time' => microtime(true)
+                ]);
             }
 
             whatsapp_log('Delay completed', 'info', [
@@ -3081,9 +3161,22 @@ class WhatsAppWebhookController extends Controller
                 'delay_seconds' => $delaySeconds,
             ]);
 
+            $this->debugDelayLog("EXITING processDelayNode - SUCCESS", [
+                'node_id' => $node['id'],
+                'return_value' => true,
+                'timestamp' => date('Y-m-d H:i:s')
+            ]);
+
             return true;
 
         } catch (\Exception $e) {
+            $this->debugDelayLog("DELAY NODE ERROR", [
+                'node_id' => $node['id'],
+                'error_message' => $e->getMessage(),
+                'error_trace' => $e->getTraceAsString(),
+                'node_data' => $nodeData
+            ]);
+            
             whatsapp_log('Error processing delay node', 'error', [
                 'node_id' => $node['id'],
                 'error' => $e->getMessage(),
@@ -3168,6 +3261,22 @@ class WhatsAppWebhookController extends Controller
                 'error' => $e->getMessage(),
                 'contact_number' => $contactNumber,
             ]);
+        }
+    }
+
+    /**
+     * Debug logging specifically for delay nodes
+     */
+    protected function debugDelayLog($message, $data = [])
+    {
+        try {
+            $logEntry = "\n" . date('Y-m-d H:i:s') . " - " . $message . "\n";
+            $logEntry .= "Data: " . json_encode($data, JSON_PRETTY_PRINT) . "\n";
+            $logEntry .= str_repeat('=', 80) . "\n";
+            
+            file_put_contents(base_path('delay_debug.log'), $logEntry, FILE_APPEND);
+        } catch (\Exception $e) {
+            // Silently fail if debug logging fails
         }
     }
 }
