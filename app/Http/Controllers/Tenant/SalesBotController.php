@@ -213,14 +213,34 @@ class SalesBotController extends Controller
      */
     public function syncProducts($salesBot): JsonResponse
     {
-        // Handle both model objects and IDs (fallback for route binding issues)
-        if (!$salesBot instanceof SalesBot) {
-            $salesBot = SalesBot::where('id', $salesBot)
-                ->where('tenant_id', Tenant::current()->id)
-                ->firstOrFail();
-        }
-
         try {
+            // Handle both model objects and IDs (fallback for route binding issues)
+            if (!$salesBot instanceof SalesBot) {
+                $currentTenant = Tenant::current();
+                $salesBotId = $salesBot;
+                
+                $salesBot = SalesBot::where('id', $salesBotId)
+                    ->where('tenant_id', $currentTenant->id)
+                    ->first();
+                
+                if (!$salesBot) {
+                    // Get available SalesBots for debugging
+                    $availableBots = SalesBot::where('tenant_id', $currentTenant->id)->get(['id', 'name']);
+                    
+                    return response()->json([
+                        'success' => false,
+                        'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}",
+                        'debug_info' => [
+                            'requested_salesbot_id' => $salesBotId,
+                            'tenant_id' => $currentTenant->id,
+                            'tenant_key' => $currentTenant->tenant_key ?? 'Unknown',
+                            'available_salesbots' => $availableBots->toArray(),
+                            'suggestion' => 'Create a SalesBot first or check the correct SalesBot ID'
+                        ]
+                    ], 404);
+                }
+            }
+
             $result = $this->salesBotService->syncProducts($salesBot);
 
             return response()->json([

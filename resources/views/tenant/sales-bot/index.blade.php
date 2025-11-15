@@ -191,12 +191,38 @@ function syncProducts() {
                 alert('Products synced successfully! ' + data.message);
                 location.reload();
             } else {
-                alert('Sync failed: ' + data.message);
+                // Enhanced error handling with debug info
+                let errorMessage = 'Sync failed: ' + data.message;
+                
+                if (data.debug_info) {
+                    console.error('Debug Info:', data.debug_info);
+                    errorMessage += '\n\nDebug Information:';
+                    errorMessage += '\nRequested SalesBot ID: ' + data.debug_info.requested_salesbot_id;
+                    errorMessage += '\nTenant ID: ' + data.debug_info.tenant_id;
+                    
+                    if (data.debug_info.available_salesbots && data.debug_info.available_salesbots.length > 0) {
+                        errorMessage += '\n\nAvailable SalesBots for your tenant:';
+                        data.debug_info.available_salesbots.forEach(bot => {
+                            errorMessage += '\n- ID: ' + bot.id + ', Name: ' + bot.name;
+                        });
+                        errorMessage += '\n\nPlease use the correct SalesBot ID or create a new one.';
+                    } else {
+                        errorMessage += '\n\nNo SalesBots found for your tenant.';
+                        errorMessage += '\nPlease create a SalesBot first.';
+                        
+                        if (confirm(errorMessage + '\n\nWould you like to create a SalesBot now?')) {
+                            window.location.href = '{{ tenant_route("tenant.sales-bot.create") }}';
+                            return;
+                        }
+                    }
+                }
+                
+                alert(errorMessage);
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred during sync');
+            alert('An error occurred during sync. Please check the console for details.');
         });
     }
 }
