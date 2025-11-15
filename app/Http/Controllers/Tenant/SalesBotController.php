@@ -95,6 +95,9 @@ class SalesBotController extends Controller
 
             DB::beginTransaction();
 
+            // Create a temporary instance to get default settings
+            $tempBot = new SalesBot();
+            
             $salesBot = SalesBot::create([
                 'tenant_id' => tenant('id'),
                 'name' => $request->name,
@@ -104,11 +107,11 @@ class SalesBotController extends Controller
                 'orders_sheet_name' => $request->orders_sheet_name ?? 'Orders',
                 'working_hours' => $request->working_hours,
                 'reminder_settings' => array_merge(
-                    $salesBot->getDefaultReminderSettings(),
+                    $tempBot->getDefaultReminderSettings(),
                     $request->reminder_settings ?? []
                 ),
                 'upselling_settings' => array_merge(
-                    $salesBot->getDefaultUpsellSettings(),
+                    $tempBot->getDefaultUpsellSettings(),
                     $request->upselling_settings ?? []
                 ),
                 'is_active' => true,
@@ -146,7 +149,10 @@ class SalesBotController extends Controller
      */
     public function show(SalesBot $salesBot)
     {
-        $this->authorize('view', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            abort(403, 'Unauthorized access to Sales Bot');
+        }
         
         $salesBot->load(['products', 'orders', 'reminders']);
         
@@ -158,7 +164,10 @@ class SalesBotController extends Controller
      */
     public function edit(SalesBot $salesBot)
     {
-        $this->authorize('update', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            abort(403, 'Unauthorized access to Sales Bot');
+        }
         
         return view('tenant.sales-bot.edit', compact('salesBot'));
     }
@@ -168,7 +177,10 @@ class SalesBotController extends Controller
      */
     public function update(Request $request, SalesBot $salesBot)
     {
-        $this->authorize('update', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            abort(403, 'Unauthorized access to Sales Bot');
+        }
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -211,7 +223,10 @@ class SalesBotController extends Controller
      */
     public function syncProducts(SalesBot $salesBot): JsonResponse
     {
-        $this->authorize('update', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         try {
             $result = $this->salesBotService->syncProducts($salesBot);
@@ -235,7 +250,10 @@ class SalesBotController extends Controller
      */
     public function products(SalesBot $salesBot)
     {
-        $this->authorize('view', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $products = $salesBot->products()
             ->when(request('category'), fn($q, $category) => $q->byCategory($category))
@@ -254,7 +272,10 @@ class SalesBotController extends Controller
      */
     public function orders(SalesBot $salesBot)
     {
-        $this->authorize('view', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $orders = $salesBot->orders()
             ->with('contact')
@@ -274,7 +295,10 @@ class SalesBotController extends Controller
      */
     public function updateOrderStatus(Request $request, SalesBot $salesBot, SalesBotOrder $order): JsonResponse
     {
-        $this->authorize('update', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $validator = Validator::make($request->all(), [
             'status' => 'required|in:pending,confirmed,processing,shipped,delivered,cancelled',
@@ -319,7 +343,10 @@ class SalesBotController extends Controller
      */
     public function analytics(SalesBot $salesBot)
     {
-        $this->authorize('view', $salesBot);
+        // Check tenant access
+        if ($salesBot->tenant_id !== tenant('id')) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
+        }
 
         $days = request('days', 30);
         $startDate = now()->subDays($days);
