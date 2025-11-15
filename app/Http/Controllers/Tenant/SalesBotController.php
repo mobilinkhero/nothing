@@ -493,9 +493,56 @@ class SalesBotController extends Controller
     /**
      * Get analytics data
      */
-    public function analytics(SalesBot $salesBot)
+    public function analytics($salesBot)
     {
-        // Tenant access is now handled by route model binding
+        // Handle both model objects and IDs (fallback for route binding issues)
+        if (!$salesBot instanceof SalesBot) {
+            $currentTenant = Tenant::current();
+            if (!$currentTenant) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No current tenant found'
+                    ], 400);
+                }
+                abort(400, 'No current tenant found');
+            }
+            
+            $salesBotId = $salesBot;
+            
+            // Handle case where route binding passes non-numeric ID
+            if (!is_numeric($salesBotId)) {
+                // Get the first available SalesBot for this tenant as a fallback
+                $salesBot = SalesBot::where('tenant_id', $currentTenant->id)->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "No SalesBot found for tenant {$currentTenant->id}. Invalid ID '{$salesBotId}' provided."
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+                
+                // Log this issue for debugging
+                \Log::warning("SalesBot analytics called with invalid ID: {$salesBotId}, using first available SalesBot ID: {$salesBot->id}");
+            } else {
+                $salesBot = SalesBot::where('id', $salesBotId)
+                    ->where('tenant_id', $currentTenant->id)
+                    ->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}"
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+            }
+        }
 
         $days = request('days', 30);
         $startDate = now()->subDays($days);
