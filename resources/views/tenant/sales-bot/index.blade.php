@@ -181,8 +181,13 @@
 @if($salesBot)
 <script>
 function syncProducts() {
+    // Debug: Show the URL being generated
+    const url = '{{ $salesBot ? tenant_route("tenant.sales-bot.sync-products", ["salesBot" => $salesBot->id]) : "#" }}';
+    console.log('Generated URL:', url);
+    alert('URL being used: ' + url);
+    
     if (confirm('This will sync products from your Google Sheet. Continue?')) {
-        fetch('{{ $salesBot ? tenant_route("tenant.sales-bot.sync-products", ["salesBot" => $salesBot->id]) : "#" }}', {
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
