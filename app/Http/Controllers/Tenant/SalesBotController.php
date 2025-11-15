@@ -211,9 +211,15 @@ class SalesBotController extends Controller
     /**
      * Sync products from Google Sheets
      */
-    public function syncProducts(SalesBot $salesBot): JsonResponse
+    public function syncProducts($salesBot): JsonResponse
     {
-        // Tenant access is now handled by route model binding
+        // Handle both model objects and IDs (fallback for route binding issues)
+        if (!$salesBot instanceof SalesBot) {
+            $salesBot = SalesBot::where('id', $salesBot)
+                ->where('tenant_id', Tenant::current()->id)
+                ->firstOrFail();
+        }
+
         try {
             $result = $this->salesBotService->syncProducts($salesBot);
 

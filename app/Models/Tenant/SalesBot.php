@@ -35,6 +35,21 @@ class SalesBot extends BaseModel
         'is_active' => 'boolean',
     ];
 
+    /**
+     * Resolve the route model binding with tenant scoping
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        $query = $this->where($field ?? $this->getRouteKeyName(), $value);
+        
+        // Add tenant scoping if available
+        if (function_exists('current_tenant') && current_tenant()) {
+            $query->where('tenant_id', current_tenant()->id);
+        }
+        
+        return $query->first();
+    }
+
     public function products(): HasMany
     {
         return $this->hasMany(SalesBotProduct::class);
