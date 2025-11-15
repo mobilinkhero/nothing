@@ -5,6 +5,10 @@ namespace App\Services;
 use Google\Client;
 use Google\Service\Sheets;
 use Google\Service\Sheets\ValueRange;
+use Google\Service\Sheets\Sheet;
+use Google\Service\Sheets\SheetProperties;
+use Google\Service\Sheets\AddSheetRequest;
+use Google\Service\Sheets\BatchUpdateSpreadsheetRequest;
 use Illuminate\Support\Facades\Log;
 use Exception;
 
@@ -130,22 +134,30 @@ class GoogleSheetsService
      */
     public function saveOrder(string $spreadsheetId, array $orderData, string $sheetName = 'Orders'): bool
     {
-        // Prepare order data for sheets
-        $values = [[
-            $orderData['order_number'] ?? '',
-            $orderData['customer_name'] ?? '',
-            $orderData['customer_phone'] ?? '',
-            $orderData['total_amount'] ?? '',
-            $orderData['currency'] ?? '',
-            $orderData['status'] ?? '',
-            $orderData['products_summary'] ?? '',
-            $orderData['created_at'] ?? date('Y-m-d H:i:s'),
-            $orderData['delivery_info']['address'] ?? '',
-            $orderData['customer_notes'] ?? '',
-        ]];
+        try {
+            // Ensure sheet exists and has proper headers
+            $this->createOrdersHeaders($spreadsheetId, $sheetName);
+            
+            // Prepare order data for sheets
+            $values = [[
+                $orderData['order_number'] ?? '',
+                $orderData['customer_name'] ?? '',
+                $orderData['customer_phone'] ?? '',
+                $orderData['total_amount'] ?? '',
+                $orderData['currency'] ?? '',
+                $orderData['status'] ?? '',
+                $orderData['products_summary'] ?? '',
+                $orderData['created_at'] ?? date('Y-m-d H:i:s'),
+                is_array($orderData['delivery_info']) ? ($orderData['delivery_info']['address'] ?? '') : '',
+                $orderData['customer_notes'] ?? '',
+            ]];
 
-        $range = $sheetName . '!A:J';
-        return $this->appendSheet($spreadsheetId, $range, $values);
+            $range = $sheetName . '!A:J';
+            return $this->appendSheet($spreadsheetId, $range, $values);
+        } catch (Exception $e) {
+            Log::error('Save order error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -153,12 +165,25 @@ class GoogleSheetsService
      */
     public function createProductsHeaders(string $spreadsheetId, string $sheetName = 'Products'): bool
     {
-        $headers = [
-            ['Name', 'Description', 'Price', 'Currency', 'Category', 'Stock Quantity', 'Images', 'Tags', 'Available', 'Upsell Products']
-        ];
+        try {
+            // Ensure sheet exists first
+            $this->ensureSheetExists($spreadsheetId, $sheetName);
+            
+            // Check if headers already exist
+            if ($this->hasHeaders($spreadsheetId, $sheetName)) {
+                return true; // Headers already exist
+            }
+            
+            $headers = [
+                ['Name', 'Description', 'Price', 'Currency', 'Category', 'Stock Quantity', 'Images', 'Tags', 'Available', 'Upsell Products']
+            ];
 
-        $range = $sheetName . '!A1:J1';
-        return $this->writeSheet($spreadsheetId, $range, $headers);
+            $range = $sheetName . '!A1:J1';
+            return $this->writeSheet($spreadsheetId, $range, $headers);
+        } catch (Exception $e) {
+            Log::error('Create products headers error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -166,12 +191,25 @@ class GoogleSheetsService
      */
     public function createOrdersHeaders(string $spreadsheetId, string $sheetName = 'Orders'): bool
     {
-        $headers = [
-            ['Order Number', 'Customer Name', 'Customer Phone', 'Total Amount', 'Currency', 'Status', 'Products', 'Created At', 'Delivery Address', 'Notes']
-        ];
+        try {
+            // Ensure sheet exists first
+            $this->ensureSheetExists($spreadsheetId, $sheetName);
+            
+            // Check if headers already exist
+            if ($this->hasHeaders($spreadsheetId, $sheetName)) {
+                return true; // Headers already exist
+            }
+            
+            $headers = [
+                ['Order Number', 'Customer Name', 'Customer Phone', 'Total Amount', 'Currency', 'Status', 'Products', 'Created At', 'Delivery Address', 'Notes']
+            ];
 
-        $range = $sheetName . '!A1:J1';
-        return $this->writeSheet($spreadsheetId, $range, $headers);
+            $range = $sheetName . '!A1:J1';
+            return $this->writeSheet($spreadsheetId, $range, $headers);
+        } catch (Exception $e) {
+            Log::error('Create orders headers error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -223,6 +261,75 @@ class GoogleSheetsService
         } catch (Exception $e) {
             Log::error('Get sheet names error: ' . $e->getMessage());
             return [];
+        }
+    }
+
+    /**
+     * Check if sheet exists, create if it doesn't
+     */
+    public function ensureSheetExists(string $spreadsheetId, string $sheetName): bool
+    {
+        try {
+            $existingSheets = $this->getSheetNames($spreadsheetId);
+            
+            if (in_array($sheetName, $existingSheets)) {
+                return true; // Sheet already exists
+            }
+            
+            // Create the sheet
+            return $this->createSheet($spreadsheetId, $sheetName);
+            
+        } catch (Exception $e) {
+            Log::error('Ensure sheet exists error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a new sheet in the spreadsheet
+     */
+    public function createSheet(string $spreadsheetId, string $sheetName): bool
+    {
+        try {
+            $sheetProperties = new SheetProperties();
+            $sheetProperties->setTitle($sheetName);
+            
+            $sheet = new Sheet();
+            $sheet->setProperties($sheetProperties);
+            
+            $addSheetRequest = new AddSheetRequest();
+            $addSheetRequest->setProperties($sheetProperties);
+            
+            $batchUpdateRequest = new BatchUpdateSpreadsheetRequest();
+            $batchUpdateRequest->setRequests([$addSheetRequest]);
+            
+            $this->sheetsService->spreadsheets->batchUpdate(
+                $spreadsheetId,
+                $batchUpdateRequest
+            );
+            
+            Log::info("Created sheet '{$sheetName}' in spreadsheet {$spreadsheetId}");
+            return true;
+            
+        } catch (Exception $e) {
+            Log::error("Failed to create sheet '{$sheetName}': " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if sheet has headers (first row has data)
+     */
+    public function hasHeaders(string $spreadsheetId, string $sheetName): bool
+    {
+        try {
+            $range = $sheetName . '!A1:J1';
+            $values = $this->readSheet($spreadsheetId, $range);
+            
+            return !empty($values) && !empty($values[0]);
+        } catch (Exception $e) {
+            Log::error('Check headers error: ' . $e->getMessage());
+            return false;
         }
     }
 }
