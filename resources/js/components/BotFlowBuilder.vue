@@ -373,7 +373,6 @@ function addNodeAtPosition(type, position) {
                 delayType: 'fixed',
                 duration: 3,
                 unit: 'seconds',
-                showTyping: true,
                 isValid: true
             };
             break;

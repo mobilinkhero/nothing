@@ -3093,7 +3093,6 @@ class WhatsAppWebhookController extends Controller
             ]);
             
             $delayType = $nodeData['delayType'] ?? 'fixed';
-            $showTyping = $nodeData['showTyping'] ?? true;
             
             // Calculate delay in seconds
             $delaySeconds = $this->calculateDelaySeconds($nodeData);
@@ -3101,7 +3100,6 @@ class WhatsAppWebhookController extends Controller
             $this->debugDelayLog("DELAY CALCULATION", [
                 'delay_type' => $delayType,
                 'delay_seconds' => $delaySeconds,
-                'show_typing' => $showTyping,
                 'calculation_input' => [
                     'duration' => $nodeData['duration'] ?? 'not_set',
                     'unit' => $nodeData['unit'] ?? 'not_set',
@@ -3114,27 +3112,8 @@ class WhatsAppWebhookController extends Controller
                 'node_id' => $node['id'],
                 'delay_type' => $delayType,
                 'delay_seconds' => $delaySeconds,
-                'show_typing' => $showTyping,
                 'contact_number' => $contactNumber,
             ]);
-
-            // Show typing indicator if enabled (non-blocking)
-            if ($showTyping && $delaySeconds > 2) {
-                $this->debugDelayLog("SENDING TYPING INDICATOR", [
-                    'delay_seconds' => $delaySeconds,
-                    'contact_number' => $contactNumber
-                ]);
-                
-                try {
-                    $this->showTypingIndicator($contactNumber, $phoneNumberId, min($delaySeconds, 30));
-                    $this->debugDelayLog("TYPING INDICATOR SENT SUCCESSFULLY", []);
-                } catch (\Exception $e) {
-                    $this->debugDelayLog("TYPING INDICATOR FAILED - CONTINUING", [
-                        'error' => $e->getMessage()
-                    ]);
-                    // Continue with delay even if typing fails
-                }
-            }
 
             // Implement actual delay
             if ($delaySeconds > 0) {
@@ -3254,27 +3233,6 @@ class WhatsAppWebhookController extends Controller
         }
     }
 
-    /**
-     * Show typing indicator during delay
-     */
-    protected function showTypingIndicator($contactNumber, $phoneNumberId, $duration)
-    {
-        try {
-            // Send typing indicator
-            $this->setWaTenantId($this->tenant_id)->sendTypingIndicator($contactNumber, $phoneNumberId);
-            
-            whatsapp_log('Typing indicator sent', 'debug', [
-                'contact_number' => $contactNumber,
-                'phone_number_id' => $phoneNumberId,
-                'duration' => $duration,
-            ]);
-        } catch (\Exception $e) {
-            whatsapp_log('Failed to send typing indicator', 'warning', [
-                'error' => $e->getMessage(),
-                'contact_number' => $contactNumber,
-            ]);
-        }
-    }
 
     /**
      * Process connected nodes after delay completes

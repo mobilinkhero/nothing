@@ -190,18 +190,6 @@
             </div>
           </div>
 
-          <!-- Show Typing Indicator -->
-          <div class="flex items-center">
-            <input
-              v-model="nodeData.showTyping"
-              type="checkbox"
-              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              @change="updateNodeData"
-            />
-            <label class="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Show typing indicator during delay
-            </label>
-          </div>
 
           <!-- Delay Preview -->
           <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border">
@@ -273,7 +261,6 @@ const nodeData = reactive({
   scheduleType: props.data?.scheduleType || 'specific_time',
   scheduledTime: props.data?.scheduledTime || '09:00',
   scheduledDays: props.data?.scheduledDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-  showTyping: props.data?.showTyping !== undefined ? props.data.showTyping : true,
 })
 
 // Get delay description for preview
