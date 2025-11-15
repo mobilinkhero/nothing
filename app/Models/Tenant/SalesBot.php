@@ -7,7 +7,6 @@ use App\Traits\BelongsToTenant;
 use App\Traits\TracksFeatureUsage;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Tenant\SalesBotInteraction;
 
 class SalesBot extends BaseModel
 {
