@@ -244,10 +244,15 @@ class SalesBotController extends Controller
             ->when(request('search'), fn($q, $search) => $q->where('name', 'like', "%{$search}%"))
             ->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data' => $products
-        ]);
+        // Return JSON for API requests, view for web requests
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'data' => $products
+            ]);
+        }
+
+        return view('tenant.sales-bot.products', compact('salesBot', 'products'));
     }
 
     /**
@@ -264,10 +269,15 @@ class SalesBotController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
-        return response()->json([
-            'success' => true,
-            'data' => $orders
-        ]);
+        // Return JSON for API requests, view for web requests
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'data' => $orders
+            ]);
+        }
+
+        return view('tenant.sales-bot.orders', compact('salesBot', 'orders'));
     }
 
     /**
@@ -370,10 +380,15 @@ class SalesBotController extends Controller
             ]
         ];
 
-        return response()->json([
-            'success' => true,
-            'data' => $analytics
-        ]);
+        // Return JSON for API requests, view for web requests
+        if (request()->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'data' => $analytics
+            ]);
+        }
+
+        return view('tenant.sales-bot.analytics', compact('salesBot', 'analytics'));
     }
 
     /**
