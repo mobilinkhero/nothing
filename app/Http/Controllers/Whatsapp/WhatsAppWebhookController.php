@@ -2246,6 +2246,11 @@ class WhatsAppWebhookController extends Controller
         ]);
 
         try {
+            // Special handling for delay nodes
+            if ($nodeType === 'delay') {
+                return $this->processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context);
+            }
+            
             do_action('before_send_flow_message', ['contact_number' => $contactNumber, 'node_data' => $nodeData, 'node_type' => $nodeType, 'phone_number_id' => $phoneNumberId, 'contact_data' => $contactData, 'context' => $context, 'tenant_id' => $this->tenant_id, 'tenant_subdomain' => $this->tenant_subdoamin]);
             // Use the WhatsApp trait methods directly
             $result = $this->sendFlowMessage(
@@ -3030,6 +3035,139 @@ class WhatsAppWebhookController extends Controller
                 $e,
                 $this->tenant_id
             );
+        }
+    }
+
+    /**
+     * Process delay node with actual delay implementation
+     */
+    protected function processDelayNode($node, $nodeData, $contactNumber, $phoneNumberId, $contactData, $context)
+    {
+        try {
+            $delayType = $nodeData['delayType'] ?? 'fixed';
+            $showTyping = $nodeData['showTyping'] ?? true;
+            
+            // Calculate delay in seconds
+            $delaySeconds = $this->calculateDelaySeconds($nodeData);
+            
+            whatsapp_log('Processing delay node - starting', 'info', [
+                'node_id' => $node['id'],
+                'delay_type' => $delayType,
+                'delay_seconds' => $delaySeconds,
+                'show_typing' => $showTyping,
+                'contact_number' => $contactNumber,
+            ]);
+
+            // Show typing indicator if enabled
+            if ($showTyping && $delaySeconds > 2) {
+                $this->showTypingIndicator($contactNumber, $phoneNumberId, min($delaySeconds, 30));
+            }
+
+            // Implement actual delay
+            if ($delaySeconds > 0) {
+                // Convert seconds to microseconds for usleep
+                $delayMicroseconds = min($delaySeconds * 1000000, 30000000); // Max 30 seconds to avoid timeouts
+                whatsapp_log('Implementing delay', 'info', [
+                    'node_id' => $node['id'],
+                    'delay_seconds' => $delaySeconds,
+                    'delay_microseconds' => $delayMicroseconds,
+                ]);
+                
+                usleep($delayMicroseconds);
+            }
+
+            whatsapp_log('Delay completed', 'info', [
+                'node_id' => $node['id'],
+                'delay_seconds' => $delaySeconds,
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            whatsapp_log('Error processing delay node', 'error', [
+                'node_id' => $node['id'],
+                'error' => $e->getMessage(),
+                'node_data' => $nodeData,
+            ], $e);
+
+            // Return true to continue flow even if delay fails
+            return true;
+        }
+    }
+
+    /**
+     * Calculate delay in seconds based on node configuration
+     */
+    protected function calculateDelaySeconds($nodeData)
+    {
+        $delayType = $nodeData['delayType'] ?? 'fixed';
+        
+        switch ($delayType) {
+            case 'fixed':
+                $duration = $nodeData['duration'] ?? 3;
+                $unit = $nodeData['unit'] ?? 'seconds';
+                return $this->convertToSeconds($duration, $unit);
+                
+            case 'random':
+                $minDuration = $nodeData['minDuration'] ?? 1;
+                $maxDuration = $nodeData['maxDuration'] ?? 5;
+                $unit = $nodeData['unit'] ?? 'seconds';
+                $randomDuration = rand($minDuration, $maxDuration);
+                return $this->convertToSeconds($randomDuration, $unit);
+                
+            case 'typing':
+                $messageLength = $nodeData['messageLength'] ?? 100;
+                $typingSpeed = $nodeData['typingSpeed'] ?? 'normal';
+                $wpm = $typingSpeed === 'slow' ? 40 : ($typingSpeed === 'fast' ? 80 : 60);
+                return max(1, ceil(($messageLength / 5) / ($wpm / 60)));
+                
+            case 'scheduled':
+                // For scheduled delays, return a smaller delay for immediate processing
+                // Real scheduling would need a queue system
+                return 5; // 5 seconds placeholder
+                
+            default:
+                return 3;
+        }
+    }
+
+    /**
+     * Convert duration to seconds
+     */
+    protected function convertToSeconds($duration, $unit)
+    {
+        switch ($unit) {
+            case 'minutes':
+                return min($duration * 60, 1800); // Max 30 minutes
+            case 'hours':
+                return min($duration * 3600, 3600); // Max 1 hour for immediate processing
+            case 'days':
+                return min($duration * 86400, 3600); // Max 1 hour for immediate processing  
+            case 'seconds':
+            default:
+                return min($duration, 1800); // Max 30 minutes
+        }
+    }
+
+    /**
+     * Show typing indicator during delay
+     */
+    protected function showTypingIndicator($contactNumber, $phoneNumberId, $duration)
+    {
+        try {
+            // Send typing indicator
+            $this->setWaTenantId($this->tenant_id)->sendTypingIndicator($contactNumber, $phoneNumberId);
+            
+            whatsapp_log('Typing indicator sent', 'debug', [
+                'contact_number' => $contactNumber,
+                'phone_number_id' => $phoneNumberId,
+                'duration' => $duration,
+            ]);
+        } catch (\Exception $e) {
+            whatsapp_log('Failed to send typing indicator', 'warning', [
+                'error' => $e->getMessage(),
+                'contact_number' => $contactNumber,
+            ]);
         }
     }
 }

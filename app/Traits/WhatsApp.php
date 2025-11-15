@@ -1425,8 +1425,6 @@ trait WhatsApp
             case 'inputCollection':
                 return $this->processFlowInputCollection($to, $nodeData, $phoneNumberId, $contactData, $context);
 
-            case 'quickReplies':
-                return $this->sendFlowQuickReplies($to, $nodeData, $phoneNumberId, $contactData, $context);
 
             case 'tagManagement':
                 return $this->processFlowTagManagement($nodeData, $phoneNumberId, $contactData, $context);
@@ -4150,6 +4148,36 @@ trait WhatsApp
         } catch (\Exception $e) {
             // Silently fail if logging fails
             \Log::error('Flow debug logging failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Send typing indicator to WhatsApp
+     */
+    public function sendTypingIndicator($to, $phoneNumberId)
+    {
+        try {
+            $whatsappApi = $this->getWhatsAppApi();
+            
+            // WhatsApp typing indicator API call
+            $response = $whatsappApi->sendTyping($to, true, $phoneNumberId);
+            
+            return [
+                'status' => true,
+                'message' => 'Typing indicator sent',
+                'data' => $response
+            ];
+        } catch (\Exception $e) {
+            whatsapp_log('Failed to send typing indicator', 'warning', [
+                'to' => $to,
+                'phone_number_id' => $phoneNumberId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return [
+                'status' => false,
+                'message' => 'Failed to send typing indicator: ' . $e->getMessage()
+            ];
         }
     }
 }
