@@ -1,8 +1,7 @@
-@extends('layouts.tenant')
-
-@section('title', 'Setup Sales Bot')
-
-@section('content')
+<x-app-layout>
+    <x-slot:title>
+        Setup Sales Bot
+    </x-slot:title>
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -293,4 +292,4 @@ document.querySelectorAll('input, select, textarea').forEach(input => {
     });
 });
 </script>
-@endsection
+</x-app-layout>

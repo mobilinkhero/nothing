@@ -1,8 +1,7 @@
-@extends('layouts.tenant')
-
-@section('title', 'Sales Bot Dashboard')
-
-@section('content')
+<x-app-layout>
+    <x-slot:title>
+        Sales Bot Dashboard
+    </x-slot:title>
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
@@ -240,4 +239,4 @@ function testConnection() {
 }
 </script>
 @endif
-@endsection
+</x-app-layout>
