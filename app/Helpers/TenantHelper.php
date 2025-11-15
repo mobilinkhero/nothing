@@ -334,6 +334,18 @@ if (! function_exists('tenant_route')) {
             return route($name, $parameters, $absolute);
         }
 
+        // Convert parameters to array if it's a model object
+        if (is_object($parameters) && method_exists($parameters, 'getKey')) {
+            // It's an Eloquent model, extract the key
+            $parameters = [$parameters->getKey()];
+        } elseif (is_object($parameters)) {
+            // It's some other object, convert to array
+            $parameters = [];
+        } elseif (!is_array($parameters)) {
+            // It's a scalar value, wrap in array
+            $parameters = [$parameters];
+        }
+
         // Generate route with subdomain parameter
         return route($name, array_merge(['subdomain' => $subdomain], $parameters), $absolute);
     }
