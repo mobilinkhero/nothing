@@ -140,7 +140,7 @@
     <script>
     function syncProducts() {
         if (confirm('This will sync products from your Google Sheet. Continue?')) {
-            fetch('{{ tenant_route("tenant.sales-bot.sync-products", $salesBot->id) }}', {
+            fetch('{{ tenant_route("tenant.sales-bot.sync-products", ["salesBot" => $salesBot->id]) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
