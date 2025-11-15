@@ -275,6 +275,9 @@ Route::middleware(['auth', TenantMiddleware::class, CheckTenantDeleted::class, E
             Route::get('/custom-fields/create', CustomFieldCreator::class)->name('custom-fields.create');
             Route::get('/custom-fields/{customFieldId}/edit', CustomFieldCreator::class)->name('custom-fields.edit');
 
+            // Sales Bot Routes
+            require __DIR__.'/sales-bot.php';
+
             Route::post('/coupons/validate', [CouponController::class, 'validate'])->name('coupon.validate');
             Route::post('/coupons/apply', [CouponController::class, 'apply'])->name('coupon.apply');
             Route::post('/coupons/remove', [CouponController::class, 'remove'])->name('coupon.remove');
