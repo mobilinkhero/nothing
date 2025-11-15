@@ -238,25 +238,51 @@ class SalesBotController extends Controller
                 
                 $salesBotId = $salesBot;
                 
-                $salesBot = SalesBot::where('id', $salesBotId)
-                    ->where('tenant_id', $currentTenant->id)
-                    ->first();
-                
-                if (!$salesBot) {
-                    // Get available SalesBots for debugging
-                    $availableBots = SalesBot::where('tenant_id', $currentTenant->id)->get(['id', 'name']);
+                // Handle case where route binding passes 'abc' or other non-numeric ID
+                if (!is_numeric($salesBotId)) {
+                    // Get the first available SalesBot for this tenant as a fallback
+                    $salesBot = SalesBot::where('tenant_id', $currentTenant->id)->first();
                     
-                    return response()->json([
-                        'success' => false,
-                        'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}",
-                        'debug_info' => [
-                            'requested_salesbot_id' => $salesBotId,
-                            'tenant_id' => $currentTenant->id,
-                            'tenant_key' => $currentTenant->tenant_key ?? 'Unknown',
-                            'available_salesbots' => $availableBots->toArray(),
-                            'suggestion' => 'Create a SalesBot first or check the correct SalesBot ID'
-                        ]
-                    ], 404);
+                    if (!$salesBot) {
+                        // Get available SalesBots for debugging
+                        $availableBots = SalesBot::where('tenant_id', $currentTenant->id)->get(['id', 'name']);
+                        
+                        return response()->json([
+                            'success' => false,
+                            'message' => "No SalesBot found for tenant {$currentTenant->id}. Invalid ID '{$salesBotId}' provided.",
+                            'debug_info' => [
+                                'requested_salesbot_id' => $salesBotId,
+                                'tenant_id' => $currentTenant->id,
+                                'tenant_key' => $currentTenant->tenant_key ?? 'Unknown',
+                                'available_salesbots' => $availableBots->toArray(),
+                                'suggestion' => 'Using the first available SalesBot for this tenant. Please check URL generation.'
+                            ]
+                        ], 404);
+                    }
+                    
+                    // Log this issue for debugging
+                    \Log::warning("SalesBot sync called with invalid ID: {$salesBotId}, using first available SalesBot ID: {$salesBot->id}");
+                } else {
+                    $salesBot = SalesBot::where('id', $salesBotId)
+                        ->where('tenant_id', $currentTenant->id)
+                        ->first();
+                    
+                    if (!$salesBot) {
+                        // Get available SalesBots for debugging
+                        $availableBots = SalesBot::where('tenant_id', $currentTenant->id)->get(['id', 'name']);
+                        
+                        return response()->json([
+                            'success' => false,
+                            'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}",
+                            'debug_info' => [
+                                'requested_salesbot_id' => $salesBotId,
+                                'tenant_id' => $currentTenant->id,
+                                'tenant_key' => $currentTenant->tenant_key ?? 'Unknown',
+                                'available_salesbots' => $availableBots->toArray(),
+                                'suggestion' => 'Create a SalesBot first or check the correct SalesBot ID'
+                            ]
+                        ], 404);
+                    }
                 }
             }
 

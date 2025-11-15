@@ -181,10 +181,20 @@
 @if($salesBot)
 <script>
 function syncProducts() {
-    // Debug: Show the URL being generated
-    const url = '{{ $salesBot ? tenant_route("tenant.sales-bot.sync-products", ["salesBot" => $salesBot->id]) : "#" }}';
+    // Use a more reliable approach to get the SalesBot ID
+    const salesBotId = {{ $salesBot ? $salesBot->id : 'null' }};
+    
+    if (!salesBotId) {
+        alert('No SalesBot found. Please create a SalesBot first.');
+        window.location.href = '{{ tenant_route("tenant.sales-bot.create") }}';
+        return;
+    }
+    
+    const baseUrl = '{{ tenant_route("tenant.sales-bot.index") }}';
+    const url = baseUrl + '/' + salesBotId + '/sync-products';
+    
     console.log('Generated URL:', url);
-    alert('URL being used: ' + url);
+    console.log('SalesBot ID:', salesBotId);
     
     if (confirm('This will sync products from your Google Sheet. Continue?')) {
         fetch(url, {
@@ -214,7 +224,29 @@ function syncProducts() {
                         data.debug_info.available_salesbots.forEach(bot => {
                             errorMessage += '\n- ID: ' + bot.id + ', Name: ' + bot.name;
                         });
-                        errorMessage += '\n\nPlease use the correct SalesBot ID or create a new one.';
+                        
+                        // Auto-retry with the first available SalesBot
+                        const firstBotId = data.debug_info.available_salesbots[0].id;
+                        if (confirm(errorMessage + '\n\nWould you like to retry with SalesBot ID ' + firstBotId + '?')) {
+                            const retryUrl = baseUrl + '/' + firstBotId + '/sync-products';
+                            fetch(retryUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                }
+                            })
+                            .then(response => response.json())
+                            .then(retryData => {
+                                if (retryData.success) {
+                                    alert('Products synced successfully! ' + retryData.message);
+                                    location.reload();
+                                } else {
+                                    alert('Retry failed: ' + retryData.message);
+                                }
+                            });
+                            return;
+                        }
                     } else {
                         errorMessage += '\n\nNo SalesBots found for your tenant.';
                         errorMessage += '\nPlease create a SalesBot first.';
