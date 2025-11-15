@@ -324,16 +324,20 @@ class GoogleSheetsService
         try {
             Log::info("Attempting to create sheet '{$sheetName}' in spreadsheet {$spreadsheetId}");
             
-            $sheetProperties = new SheetProperties();
-            $sheetProperties->setTitle($sheetName);
-            
-            $addSheetRequest = new AddSheetRequest();
-            $addSheetRequest->setProperties($sheetProperties);
+            // Create the request structure correctly
+            $addSheetRequest = [
+                'addSheet' => [
+                    'properties' => [
+                        'title' => $sheetName
+                    ]
+                ]
+            ];
             
             $batchUpdateRequest = new BatchUpdateSpreadsheetRequest();
             $batchUpdateRequest->setRequests([$addSheetRequest]);
             
             Log::info("Sending batch update request to Google Sheets API");
+            Log::info("Request structure: " . json_encode($addSheetRequest));
             
             $response = $this->sheetsService->spreadsheets->batchUpdate(
                 $spreadsheetId,
@@ -413,7 +417,15 @@ class GoogleSheetsService
             
         } catch (Exception $e) {
             Log::error("Alternative sheet creation failed for '{$sheetName}': " . $e->getMessage());
-            return false;
+            
+            // Try one more approach - using append which sometimes forces sheet creation
+            try {
+                Log::info("Trying append method to force sheet creation for '{$sheetName}'");
+                return $this->appendSheet($spreadsheetId, $sheetName . '!A1', [$headers]);
+            } catch (Exception $e2) {
+                Log::error("Append method also failed for '{$sheetName}': " . $e2->getMessage());
+                return false;
+            }
         }
     }
 }
