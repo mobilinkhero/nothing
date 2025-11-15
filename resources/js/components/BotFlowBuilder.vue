@@ -42,9 +42,7 @@ import {
   // Phase 1 New Node Icons
   BsGearFill,
   MdAccessTime,
-  HiDocumentText,
-  // Sales Bot Icon
-  MdShoppingCart
+  HiDocumentText
 } from "@kalimahapps/vue-icons";
 
 
@@ -66,8 +64,6 @@ import InputCollectionNode from "./nodes/InputCollectionNode.vue";
 // Phase 2 New Nodes
 import TagManagementNode from "./nodes/TagManagementNode.vue";
 import VariableManagementNode from "./nodes/VariableManagementNode.vue";
-// Sales Bot Node
-import SalesBotNode from "./nodes/SalesBotNode.vue";
 // Custom edge
 import CustomEdge from "./ui/CustomEdge.vue";
 
@@ -89,7 +85,6 @@ const nodeTypes = markRaw({
     inputCollection: InputCollectionNode,
     tagManagement: TagManagementNode,
     variableManagement: VariableManagementNode,
-    salesBot: SalesBotNode,
 });
 
 // Custom edge types
@@ -256,12 +251,6 @@ const nodeTemplates = reactive([
         label: "Variable Manager",
         icon: HiDocumentText,
     },
-    // Sales Bot Node
-    {
-        type: "salesBot",
-        label: "Sales Bot",
-        icon: MdShoppingCart,
-    },
 ]);
 
 // Group node templates by category
@@ -277,8 +266,8 @@ const nodeCategories = computed(() => {
         "Flow Control": ["condition", "delay", "inputCollection"],
         "Data & Variables": ["variableManagement", "tagManagement"],
         "Advanced Features": aiAssistantEnabled.value
-            ? ["aiAssistant", "webhookApi", "salesBot"]
-            : ["webhookApi", "salesBot"],
+            ? ["aiAssistant", "webhookApi"]
+            : ["webhookApi"],
     };
 });
 
@@ -430,33 +419,6 @@ function addNodeAtPosition(type, position) {
                 isValid: true
             };
             break;
-        case "salesBot":
-            nodeData = {
-                productSheetUrl: '',
-                ordersSheetUrl: '',
-                mode: 'catalog', // catalog, order, upsell, reminder
-                selectedProducts: [],
-                reminderSettings: {
-                    enabled: true,
-                    delayHours: 24,
-                    maxReminders: 3,
-                    reminderMessage: 'Hi! You have items in your cart. Complete your order now!'
-                },
-                upsellSettings: {
-                    enabled: true,
-                    triggerDays: 7,
-                    basedOn: 'interactions', // interactions, category, price_range
-                    upsellMessage: 'Based on your interests, you might like these products:'
-                },
-                orderSettings: {
-                    requireConfirmation: true,
-                    collectShipping: true,
-                    paymentMethods: ['cod', 'online'],
-                    thankYouMessage: 'Thank you for your order! We will contact you soon.'
-                },
-                isValid: true
-            };
-            break;
         // Update other node types similarly...
     }
 
@@ -549,8 +511,7 @@ const validateWorkflow = () => {
             (node.type === "delay" && node.data.isValid === false) ||
             (node.type === "inputCollection" && node.data.isValid === false) ||
             (node.type === "tagManagement" && node.data.isValid === false) ||
-            (node.type === "variableManagement" && node.data.isValid === false) ||
-            (node.type === "salesBot" && node.data.isValid === false)
+            (node.type === "variableManagement" && node.data.isValid === false)
         );
     });
 
@@ -1160,19 +1121,6 @@ function getReplyTypeText(type) {
 
                         <template #node-variableManagement="nodeProps">
                             <VariableManagementNode
-                                v-bind="nodeProps"
-                                @update-node="handleNodeUpdate"
-                                @update:isValid="
-                                    handleTextNodeValidation(
-                                        nodeProps.id,
-                                        $event
-                                    )
-                                "
-                            />
-                        </template>
-
-                        <template #node-salesBot="nodeProps">
-                            <SalesBotNode
                                 v-bind="nodeProps"
                                 @update-node="handleNodeUpdate"
                                 @update:isValid="
