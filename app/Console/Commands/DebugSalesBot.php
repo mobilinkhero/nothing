@@ -48,7 +48,7 @@ class DebugSalesBot extends Command
             return;
         }
         
-        $this->info("✅ Tenant found: {$tenant->tenant_key}");
+        $this->info("✅ Tenant found: " . ($tenant->tenant_key ?? $tenant->subdomain ?? "ID: {$tenant->id}"));
         
         // Find SalesBots for this tenant
         $salesBots = SalesBot::where('tenant_id', $tenantId)->get();
@@ -64,7 +64,8 @@ class DebugSalesBot extends Command
             }
         } else {
             $this->warn("❌ No SalesBots found for tenant {$tenantId}");
-            $this->info("💡 Create a SalesBot first at: /{$tenant->tenant_key}/sales-bot/create");
+            $tenantKey = $tenant->tenant_key ?? $tenant->subdomain ?? $tenantId;
+            $this->info("💡 Create a SalesBot first at: /{$tenantKey}/sales-bot/create");
         }
     }
     
@@ -75,7 +76,8 @@ class DebugSalesBot extends Command
         $tenants = SpatieMultitenancyTenant::all();
         
         foreach ($tenants as $tenant) {
-            $this->info("\n🏢 Tenant: {$tenant->tenant_key} (ID: {$tenant->id})");
+            $tenantName = $tenant->tenant_key ?? $tenant->subdomain ?? "ID: {$tenant->id}";
+            $this->info("\n🏢 Tenant: {$tenantName} (ID: {$tenant->id})");
             
             $salesBots = SalesBot::where('tenant_id', $tenant->id)->get();
             
