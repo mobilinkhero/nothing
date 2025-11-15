@@ -67,13 +67,26 @@ return [
             'external' => false,
         ],
 
+        'sales_bot' => [
+            'type' => 'item',
+            'label' => 'sales_bot',
+            'route' => 'sales-bot.index',
+            'icon' => 'heroicon-o-shopping-cart',
+            'permission' => null,
+            'order' => 5,
+            'active_routes' => ['sales-bot.*'],
+            'feature_required' => 'sales_bot',
+            'badge' => null,
+            'external' => false,
+        ],
+
         'sales_section' => [
             'type' => 'section',
             'label' => 'my_subscription',
             'icon' => null,
             'permission' => ['tenant.subscription.view', 'tenant.invoices.view'],
             'permission_type' => 'any',
-            'order' => 5,
+            'order' => 6,
             'section_id' => 'sales',
             'children' => [
                 'subscription' => [

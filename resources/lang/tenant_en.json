@@ -1581,6 +1581,7 @@
     "bot_flow_update_successfully": "Bot flow update successfully",
     "bot_flow_activate": "Bot flow is activated",
     "bot_flow_deactivate": "Bot flow is deactivated",
+    "sales_bot": "Sales Bot",
     "is_active": "Is Active",
     "delete_bot_flow": "Delete Bot Flow",
     "flow": "Flow",
