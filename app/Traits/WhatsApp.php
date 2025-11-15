@@ -4152,26 +4152,103 @@ trait WhatsApp
     }
 
     /**
-     * Send typing indicator to WhatsApp
+     * Send typing indicator to WhatsApp using official Meta Business API
      */
-    public function sendTypingIndicator($to, $phoneNumberId)
+    public function sendTypingIndicator($to, $phoneNumberId, $messageId = null)
     {
         try {
-            // For now, just simulate typing indicator (WhatsApp API might not support real typing)
-            // This prevents the delay from being blocked by typing indicator failures
-            whatsapp_log('Simulated typing indicator', 'debug', [
+            // Get WhatsApp API configuration
+            $accessToken = get_setting('whats-mark.whatsapp_api_key');
+            $apiVersion = 'v21.0'; // Use current API version
+            
+            if (empty($accessToken)) {
+                whatsapp_log('No WhatsApp access token found for typing indicator', 'warning', [
+                    'to' => $to,
+                    'phone_number_id' => $phoneNumberId
+                ]);
+                return [
+                    'status' => false,
+                    'message' => 'No access token configured'
+                ];
+            }
+            
+            // Prepare typing indicator request
+            $url = "https://graph.facebook.com/{$apiVersion}/{$phoneNumberId}/messages";
+            
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
                 'to' => $to,
-                'phone_number_id' => $phoneNumberId,
-                'note' => 'Real typing indicator not implemented yet'
+                'typing_indicator' => [
+                    'type' => 'text'
+                ]
+            ];
+            
+            // Add message_id and status if we have it (for marking as read)
+            if ($messageId) {
+                $payload['status'] = 'read';
+                $payload['message_id'] = $messageId;
+            }
+            
+            $headers = [
+                'Authorization: Bearer ' . $accessToken,
+                'Content-Type: application/json'
+            ];
+            
+            // Send API request
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false
             ]);
             
-            return [
-                'status' => true,
-                'message' => 'Typing indicator simulated',
-                'data' => null
-            ];
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                throw new \Exception('CURL Error: ' . $error);
+            }
+            
+            $responseData = json_decode($response, true);
+            
+            if ($httpCode === 200 && isset($responseData['success']) && $responseData['success']) {
+                whatsapp_log('Typing indicator sent successfully', 'debug', [
+                    'to' => $to,
+                    'phone_number_id' => $phoneNumberId,
+                    'response' => $responseData
+                ]);
+                
+                return [
+                    'status' => true,
+                    'message' => 'Typing indicator sent',
+                    'data' => $responseData
+                ];
+            } else {
+                whatsapp_log('Failed to send typing indicator - API error', 'warning', [
+                    'to' => $to,
+                    'phone_number_id' => $phoneNumberId,
+                    'http_code' => $httpCode,
+                    'response' => $responseData,
+                    'payload' => $payload
+                ]);
+                
+                return [
+                    'status' => false,
+                    'message' => 'API error: ' . ($responseData['error']['message'] ?? 'Unknown error'),
+                    'data' => $responseData
+                ];
+            }
+            
         } catch (\Exception $e) {
-            whatsapp_log('Failed to send typing indicator', 'warning', [
+            whatsapp_log('Failed to send typing indicator - Exception', 'warning', [
                 'to' => $to,
                 'phone_number_id' => $phoneNumberId,
                 'error' => $e->getMessage()
