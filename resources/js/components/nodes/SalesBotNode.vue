@@ -55,7 +55,10 @@
           <input
             v-model="localData.productSheetUrl"
             @input="updateNode"
-            type="url"
+            @paste="handlePaste"
+            @change="updateNode"
+            @keyup="updateNode"
+            type="text"
             placeholder="https://docs.google.com/spreadsheets/d/..."
             class="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
@@ -68,7 +71,10 @@
           <input
             v-model="localData.ordersSheetUrl"
             @input="updateNode"
-            type="url"
+            @paste="handlePaste"
+            @change="updateNode"
+            @keyup="updateNode"
+            type="text"
             placeholder="https://docs.google.com/spreadsheets/d/..."
             class="w-full text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
@@ -352,6 +358,14 @@ function getModeDescription() {
     upsell: 'Recommend products'
   };
   return descriptions[localData.value.mode] || 'Sales automation';
+}
+
+// Handle paste events
+function handlePaste(event) {
+  // Allow default paste behavior
+  setTimeout(() => {
+    updateNode();
+  }, 0);
 }
 
 // Update selected products
