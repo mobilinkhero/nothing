@@ -3176,6 +3176,9 @@ class WhatsAppWebhookController extends Controller
                 'timestamp' => date('Y-m-d H:i:s')
             ]);
 
+            // After delay completes, process connected nodes
+            $this->processDelayNodeTargets($node, $contactData, $triggerMsg, $chatId, $contactNumber, $phoneNumberId, $context);
+
             return true;
 
         } catch (\Exception $e) {
@@ -3269,6 +3272,99 @@ class WhatsAppWebhookController extends Controller
             whatsapp_log('Failed to send typing indicator', 'warning', [
                 'error' => $e->getMessage(),
                 'contact_number' => $contactNumber,
+            ]);
+        }
+    }
+
+    /**
+     * Process connected nodes after delay completes
+     */
+    protected function processDelayNodeTargets($node, $contactData, $triggerMsg, $chatId, $contactNumber, $phoneNumberId, $context)
+    {
+        try {
+            $this->debugDelayLog("PROCESSING DELAY NODE TARGETS", [
+                'node_id' => $node['id'],
+                'context_flow_id' => $context['flow_id'] ?? 'unknown'
+            ]);
+
+            // Get the flow data to find connected nodes
+            $flow = BotFlow::find($context['flow_id']);
+            if (!$flow) {
+                $this->debugDelayLog("FLOW NOT FOUND", ['flow_id' => $context['flow_id'] ?? 'unknown']);
+                return;
+            }
+
+            $flowData = json_decode($flow->flow_data, true);
+            if (empty($flowData) || empty($flowData['edges'])) {
+                $this->debugDelayLog("NO FLOW DATA OR EDGES", []);
+                return;
+            }
+
+            // Find all edges where this delay node is the source
+            $connectedNodes = [];
+            foreach ($flowData['edges'] as $edge) {
+                if ($edge['source'] === $node['id']) {
+                    $connectedNodes[] = $edge['target'];
+                }
+            }
+
+            $this->debugDelayLog("FOUND CONNECTED NODES", [
+                'connected_node_ids' => $connectedNodes,
+                'total_connections' => count($connectedNodes)
+            ]);
+
+            if (empty($connectedNodes)) {
+                $this->debugDelayLog("NO CONNECTED NODES FOUND", []);
+                return;
+            }
+
+            // Get the actual node data for connected nodes
+            $targetNodes = [];
+            foreach ($flowData['nodes'] as $flowNode) {
+                if (in_array($flowNode['id'], $connectedNodes)) {
+                    $targetNodes[] = $flowNode;
+                }
+            }
+
+            $this->debugDelayLog("PROCESSING TARGET NODES", [
+                'target_nodes' => array_map(function($n) {
+                    return ['id' => $n['id'], 'type' => $n['type']];
+                }, $targetNodes)
+            ]);
+
+            // Process each connected node
+            foreach ($targetNodes as $targetNode) {
+                $this->debugDelayLog("PROCESSING TARGET NODE", [
+                    'target_node_id' => $targetNode['id'],
+                    'target_node_type' => $targetNode['type']
+                ]);
+
+                $nodeContext = array_merge($context, [
+                    'current_node' => $targetNode['id'],
+                    'came_from_delay' => true,
+                    'delay_node_id' => $node['id']
+                ]);
+
+                $result = $this->processSingleNode(
+                    $targetNode, 
+                    $contactData, 
+                    $triggerMsg, 
+                    $chatId, 
+                    $contactNumber, 
+                    $phoneNumberId, 
+                    $nodeContext
+                );
+
+                $this->debugDelayLog("TARGET NODE RESULT", [
+                    'target_node_id' => $targetNode['id'],
+                    'success' => $result
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            $this->debugDelayLog("ERROR PROCESSING DELAY TARGETS", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }
