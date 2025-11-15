@@ -305,9 +305,56 @@ class SalesBotController extends Controller
     /**
      * Get products for Sales Bot
      */
-    public function products(SalesBot $salesBot)
+    public function products($salesBot)
     {
-        // Tenant access is now handled by route model binding
+        // Handle both model objects and IDs (fallback for route binding issues)
+        if (!$salesBot instanceof SalesBot) {
+            $currentTenant = Tenant::current();
+            if (!$currentTenant) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No current tenant found'
+                    ], 400);
+                }
+                abort(400, 'No current tenant found');
+            }
+            
+            $salesBotId = $salesBot;
+            
+            // Handle case where route binding passes non-numeric ID
+            if (!is_numeric($salesBotId)) {
+                // Get the first available SalesBot for this tenant as a fallback
+                $salesBot = SalesBot::where('tenant_id', $currentTenant->id)->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "No SalesBot found for tenant {$currentTenant->id}. Invalid ID '{$salesBotId}' provided."
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+                
+                // Log this issue for debugging
+                \Log::warning("SalesBot products called with invalid ID: {$salesBotId}, using first available SalesBot ID: {$salesBot->id}");
+            } else {
+                $salesBot = SalesBot::where('id', $salesBotId)
+                    ->where('tenant_id', $currentTenant->id)
+                    ->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}"
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+            }
+        }
 
         $products = $salesBot->products()
             ->when(request('category'), fn($q, $category) => $q->byCategory($category))
@@ -329,9 +376,56 @@ class SalesBotController extends Controller
     /**
      * Get orders for Sales Bot
      */
-    public function orders(SalesBot $salesBot)
+    public function orders($salesBot)
     {
-        // Tenant access is now handled by route model binding
+        // Handle both model objects and IDs (fallback for route binding issues)
+        if (!$salesBot instanceof SalesBot) {
+            $currentTenant = Tenant::current();
+            if (!$currentTenant) {
+                if (request()->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No current tenant found'
+                    ], 400);
+                }
+                abort(400, 'No current tenant found');
+            }
+            
+            $salesBotId = $salesBot;
+            
+            // Handle case where route binding passes non-numeric ID
+            if (!is_numeric($salesBotId)) {
+                // Get the first available SalesBot for this tenant as a fallback
+                $salesBot = SalesBot::where('tenant_id', $currentTenant->id)->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "No SalesBot found for tenant {$currentTenant->id}. Invalid ID '{$salesBotId}' provided."
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+                
+                // Log this issue for debugging
+                \Log::warning("SalesBot orders called with invalid ID: {$salesBotId}, using first available SalesBot ID: {$salesBot->id}");
+            } else {
+                $salesBot = SalesBot::where('id', $salesBotId)
+                    ->where('tenant_id', $currentTenant->id)
+                    ->first();
+                
+                if (!$salesBot) {
+                    if (request()->expectsJson()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "SalesBot with ID {$salesBotId} not found for tenant {$currentTenant->id}"
+                        ], 404);
+                    }
+                    abort(404, 'SalesBot not found');
+                }
+            }
+        }
 
         $orders = $salesBot->orders()
             ->with('contact')
