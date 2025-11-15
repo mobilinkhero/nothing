@@ -97,17 +97,17 @@
                                     <x-heroicon-o-arrow-path class="w-5 h-5 mr-2" />
                                     Sync Products
                                 </button>
-                                <a href="{{ tenant_route('tenant.sales-bot.products', $salesBot) }}" 
+                                <a href="{{ tenant_route('tenant.sales-bot.products', $salesBot->id) }}" 
                                    class="flex items-center justify-center px-4 py-3 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-lg transition duration-150 ease-in-out">
                                     <x-heroicon-o-cube class="w-5 h-5 mr-2" />
                                     View Products
                                 </a>
-                                <a href="{{ tenant_route('tenant.sales-bot.orders', $salesBot) }}" 
+                                <a href="{{ tenant_route('tenant.sales-bot.orders', $salesBot->id) }}" 
                                    class="flex items-center justify-center px-4 py-3 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800 rounded-lg transition duration-150 ease-in-out">
                                     <x-heroicon-o-shopping-cart class="w-5 h-5 mr-2" />
                                     View Orders
                                 </a>
-                                <a href="{{ tenant_route('tenant.sales-bot.analytics', $salesBot) }}" 
+                                <a href="{{ tenant_route('tenant.sales-bot.analytics', $salesBot->id) }}" 
                                    class="flex items-center justify-center px-4 py-3 bg-gray-50 hover:bg-gray-100 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg transition duration-150 ease-in-out">
                                     <x-heroicon-o-chart-bar class="w-5 h-5 mr-2" />
                                     Analytics
@@ -178,7 +178,7 @@
 <script>
 function syncProducts() {
     if (confirm('This will sync products from your Google Sheet. Continue?')) {
-        fetch('{{ tenant_route("tenant.sales-bot.sync-products", $salesBot) }}', {
+        fetch('{{ $salesBot ? tenant_route("tenant.sales-bot.sync-products", $salesBot->id) : "#" }}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
