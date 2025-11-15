@@ -150,11 +150,7 @@ class SalesBotController extends Controller
      */
     public function show(SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            abort(403, 'Unauthorized access to Sales Bot');
-        }
-        
+        // Tenant access is now handled by route model binding
         $salesBot->load(['products', 'orders', 'reminders']);
         
         return view('tenant.sales-bot.show', compact('salesBot'));
@@ -165,11 +161,7 @@ class SalesBotController extends Controller
      */
     public function edit(SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            abort(403, 'Unauthorized access to Sales Bot');
-        }
-        
+        // Tenant access is now handled by route model binding
         return view('tenant.sales-bot.edit', compact('salesBot'));
     }
 
@@ -178,10 +170,7 @@ class SalesBotController extends Controller
      */
     public function update(Request $request, SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            abort(403, 'Unauthorized access to Sales Bot');
-        }
+        // Tenant access is now handled by route model binding
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -224,11 +213,7 @@ class SalesBotController extends Controller
      */
     public function syncProducts(SalesBot $salesBot): JsonResponse
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-        }
-
+        // Tenant access is now handled by route model binding
         try {
             $result = $this->salesBotService->syncProducts($salesBot);
 
@@ -251,10 +236,7 @@ class SalesBotController extends Controller
      */
     public function products(SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-        }
+        // Tenant access is now handled by route model binding
 
         $products = $salesBot->products()
             ->when(request('category'), fn($q, $category) => $q->byCategory($category))
@@ -273,10 +255,7 @@ class SalesBotController extends Controller
      */
     public function orders(SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-        }
+        // Tenant access is now handled by route model binding
 
         $orders = $salesBot->orders()
             ->with('contact')
@@ -296,10 +275,7 @@ class SalesBotController extends Controller
      */
     public function updateOrderStatus(Request $request, SalesBot $salesBot, SalesBotOrder $order): JsonResponse
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-        }
+        // Tenant access is now handled by route model binding
 
         $validator = Validator::make($request->all(), [
             'status' => 'required|in:pending,confirmed,processing,shipped,delivered,cancelled',
@@ -344,10 +320,7 @@ class SalesBotController extends Controller
      */
     public function analytics(SalesBot $salesBot)
     {
-        // Check tenant access
-        if ($salesBot->tenant_id !== Tenant::current()->id) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized access'], 403);
-        }
+        // Tenant access is now handled by route model binding
 
         $days = request('days', 30);
         $startDate = now()->subDays($days);

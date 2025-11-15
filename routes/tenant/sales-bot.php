@@ -1,9 +1,25 @@
 <?php
 
 use App\Http\Controllers\Tenant\SalesBotController;
+use App\Models\Tenant\SalesBot;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'tenant'])->prefix('sales-bot')->name('sales-bot.')->group(function () {
+    
+    // Bind the salesBot parameter to the SalesBot model
+    Route::bind('salesBot', function ($value) {
+        $tenantId = current_tenant()?->id ?? request()->route('subdomain');
+        
+        if (!$tenantId && function_exists('tenant_id')) {
+            $tenantId = tenant_id();
+        }
+        
+        return SalesBot::where('id', $value)
+            ->when($tenantId, function ($query) use ($tenantId) {
+                return $query->where('tenant_id', $tenantId);
+            })
+            ->firstOrFail();
+    });
     
     // Main Sales Bot routes
     Route::get('/', [SalesBotController::class, 'index'])->name('index');
